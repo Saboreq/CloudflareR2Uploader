@@ -1,0 +1,27 @@
+{
+  "version": 2,
+  "dgSpecHash": "kUSXCxJ2Rgs=",
+  "success": true,
+  "projectFilePath": "D:\\Projects\\CloudflareR2Uploader\\tests\\CloudflareR2Uploader.Tests\\CloudflareR2Uploader.Tests.csproj",
+  "expectedPackageFiles": [
+    "C:\\Users\\matus\\.nuget\\packages\\awssdk.core\\3.7.501.1\\awssdk.core.3.7.501.1.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\awssdk.s3\\3.7.511.8\\awssdk.s3.3.7.511.8.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.applicationinsights\\2.22.0\\microsoft.applicationinsights.2.22.0.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testing.extensions.telemetry\\1.4.3\\microsoft.testing.extensions.telemetry.1.4.3.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testing.extensions.trxreport.abstractions\\1.4.3\\microsoft.testing.extensions.trxreport.abstractions.1.4.3.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testing.extensions.vstestbridge\\1.4.3\\microsoft.testing.extensions.vstestbridge.1.4.3.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testing.platform\\1.4.3\\microsoft.testing.platform.1.4.3.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testing.platform.msbuild\\1.4.3\\microsoft.testing.platform.msbuild.1.4.3.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\microsoft.testplatform.objectmodel\\17.11.1\\microsoft.testplatform.objectmodel.17.11.1.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\mstest.testadapter\\3.6.4\\mstest.testadapter.3.6.4.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\mstest.testframework\\3.6.4\\mstest.testframework.3.6.4.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.buffers\\4.5.1\\system.buffers.4.5.1.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.collections.immutable\\1.5.0\\system.collections.immutable.1.5.0.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.diagnostics.diagnosticsource\\5.0.0\\system.diagnostics.diagnosticsource.5.0.0.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.memory\\4.5.4\\system.memory.4.5.4.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.numerics.vectors\\4.5.0\\system.numerics.vectors.4.5.0.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.reflection.metadata\\1.6.0\\system.reflection.metadata.1.6.0.nupkg.sha512",
+    "C:\\Users\\matus\\.nuget\\packages\\system.runtime.compilerservices.unsafe\\5.0.0\\system.runtime.compilerservices.unsafe.5.0.0.nupkg.sha512"
+  ],
+  "logs": []
+}
