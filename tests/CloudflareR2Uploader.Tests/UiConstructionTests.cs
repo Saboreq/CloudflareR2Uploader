@@ -8,6 +8,7 @@ using CloudflareR2Uploader.Forms;
 using CloudflareR2Uploader.Models;
 using CloudflareR2Uploader.Services;
 using CloudflareR2Uploader.Theming;
+using CloudflareR2Uploader.Utilities;
 using Microsoft.VisualStudio.TestTools.UnitTesting;
 
 namespace CloudflareR2Uploader.Tests
@@ -15,6 +16,22 @@ namespace CloudflareR2Uploader.Tests
     [TestClass]
     public sealed class UiConstructionTests
     {
+        private TemporaryDirectory _appData;
+
+        [TestInitialize]
+        public void RedirectApplicationData()
+        {
+            _appData = new TemporaryDirectory();
+            AppPaths.OverrideRootForTesting(_appData.Path);
+        }
+
+        [TestCleanup]
+        public void RestoreApplicationData()
+        {
+            AppPaths.OverrideRootForTesting(null);
+            if (_appData != null) _appData.Dispose();
+        }
+
         [TestMethod]
         public void MainForm_DesignerControlsConstructOnStaThread()
         {
@@ -43,7 +60,7 @@ namespace CloudflareR2Uploader.Tests
                             uploadPage != null && uploadPage.ButtonStyle == ModernButtonStyle.Primary &&
                             bucketFilesPage != null && bucketFilesPage.Text == "Files" &&
                             bucketFilesPage.ButtonStyle == ModernButtonStyle.Ghost &&
-                            browserGrid != null && browserGrid.ReadOnly && !browserGrid.MultiSelect &&
+                            browserGrid != null && browserGrid.ReadOnly && browserGrid.MultiSelect &&
                             !browserGrid.AllowUserToAddRows && !browserGrid.AllowUserToDeleteRows &&
                             browserGrid.SelectionMode == DataGridViewSelectionMode.FullRowSelect &&
                             browserGrid.Columns.Count == 4 &&
@@ -52,6 +69,8 @@ namespace CloudflareR2Uploader.Tests
                             FindByName(form, "browserUpButton") is ModernButton &&
                             FindByName(form, "browserPreviousButton") is ModernButton &&
                             FindByName(form, "browserNextButton") is ModernButton &&
+                            FindByName(form, "browserFilterTextBox") is ModernTextBox &&
+                            FindByName(form, "browserDetailsToggleButton") is Button &&
                             FindByName(form, "pageTransitionOverlay") is PageTransitionOverlay &&
                             browserMenu != null &&
                             FindMenuItem(browserMenu, "browserDownloadMenuItem") != null &&
@@ -193,6 +212,36 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void MainForm_CloseToTrayKeepsFormAliveAndExplicitExitTearsDown()
+        {
+            Exception failure = null;
+            bool hideRequested = false;
+            bool aliveAfterClose = false;
+            bool disposedAfterExit = false;
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    MainForm form = new MainForm(null);
+                    EventHandler handler = (s, e) => hideRequested = true;
+                    form.HideToTrayRequested += handler;
+                    form.Show();
+                    form.Close();
+                    aliveAfterClose = !form.IsDisposed;
+                    MethodInfo exit = typeof(MainForm).GetMethod("RequestRealExit", BindingFlags.Instance | BindingFlags.NonPublic);
+                    Assert.IsTrue((bool)exit.Invoke(form, new object[] { false }));
+                    form.Close();
+                    disposedAfterExit = form.IsDisposed;
+                }
+                catch (Exception ex) { failure = ex is TargetInvocationException && ex.InnerException != null ? ex.InnerException : ex; }
+            });
+            thread.SetApartmentState(ApartmentState.STA); thread.Start();
+            Assert.IsTrue(thread.Join(TimeSpan.FromSeconds(15)));
+            if (failure != null) Assert.Fail(failure.ToString());
+            Assert.IsTrue(hideRequested); Assert.IsTrue(aliveAfterClose); Assert.IsTrue(disposedAfterExit);
+        }
+
+        [TestMethod]
         public void SettingsAndPromptDialogs_DesignerControlsConstructOnStaThread()
         {
             using (TemporaryDirectory directory = new TemporaryDirectory())
@@ -279,6 +328,43 @@ namespace CloudflareR2Uploader.Tests
                 Assert.IsTrue(bucketManagerPresent, "The Settings bucket-profile manager is missing.");
                 Assert.IsTrue(canAddBucket, "Adding a second bucket profile did not update the selector.");
             }
+        }
+
+        [TestMethod]
+        public void UpdatePromptAndProgressDialogs_ConstructOnStaThread()
+        {
+            Exception failure = null;
+            bool constructed = false;
+            Thread thread = new Thread(() =>
+            {
+                try
+                {
+                    UpdateManifest manifest = new UpdateManifest
+                    {
+                        SchemaVersion = 1,
+                        Version = "1.1.0",
+                        InstallerUrl = "https://updates.example.test/releases/1.1.0/Setup.exe",
+                        Sha256 = new string('a', 64),
+                        SizeBytes = 4096,
+                        Notes = "Synthetic release notes"
+                    };
+                    using (CancellationTokenSource cancellation = new CancellationTokenSource())
+                    using (UpdateAvailableDialog prompt = new UpdateAvailableDialog("1.0.0", manifest))
+                    using (UpdateDownloadDialog progress = new UpdateDownloadDialog(cancellation))
+                    {
+                        prompt.CreateControl();
+                        progress.CreateControl();
+                        progress.Report(new UpdateDownloadProgress { BytesReceived = 2048, TotalBytes = 4096, Percentage = 50 });
+                        constructed = prompt.Controls.Count > 0 && progress.Controls.Count > 0;
+                    }
+                }
+                catch (Exception ex) { failure = ex; }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            Assert.IsTrue(thread.Join(TimeSpan.FromSeconds(15)), "Update dialog construction timed out.");
+            if (failure != null) Assert.Fail("Update dialog construction failed: " + failure);
+            Assert.IsTrue(constructed);
         }
 
         private static UploadQueueItemControl FindUploadRow(Control root)

@@ -44,6 +44,7 @@ namespace CloudflareR2Uploader.Forms
         private bool _suppressDestinationEvents;
         private bool _suppressBucketSelection;
         private CancellationTokenSource _backgroundTest;
+        private bool _allowRealClose;
 
         /// <summary>Sticky answer when the user ticked "do the same for the rest of this queue".</summary>
         private OverwriteDecision? _stickyOverwriteDecision;
@@ -61,6 +62,7 @@ namespace CloudflareR2Uploader.Forms
             _credentialService = new CredentialProtectionService(log);
             _stateStore = new UploadStateStore(log);
             _connectionTester = new R2ConnectionTester(log);
+            StartupRegistration = new StartupRegistrationService(log);
             _objectBrowserService = new R2ObjectBrowserService(log);
             _objectOperationService = new R2ObjectOperationService(log, _stateStore);
 
@@ -80,6 +82,7 @@ namespace CloudflareR2Uploader.Forms
             ApplyTooltips();
             WireEvents();
             InitializeBrowserActions();
+            InitializeBrowserEnhancements();
             InitializePageTransition();
 
             LoadSettings();
@@ -91,6 +94,13 @@ namespace CloudflareR2Uploader.Forms
             UpdateBrowserPathDisplay();
             UpdateBrowserCommandStates();
         }
+
+        internal event EventHandler HideToTrayRequested;
+        internal event EventHandler BackgroundActivityChanged;
+        internal event EventHandler<BackgroundOperationEventArgs> BackgroundOperationCompleted;
+        internal AppSettings CurrentSettings { get { return _settings ?? new AppSettings(); } }
+        internal IStartupRegistrationService StartupRegistration { get; private set; }
+        internal bool HasShownCloseToTrayNotice { get; set; }
 
         // -------------------------------------------------------------------------- set-up
 
@@ -318,6 +328,7 @@ namespace CloudflareR2Uploader.Forms
             }
 
             _stateStore.CleanupStale();
+            ApplyBrowserEnhancementSettings();
         }
 
         protected override void OnShown(EventArgs e)
@@ -1101,8 +1112,10 @@ namespace CloudflareR2Uploader.Forms
                 if (connectionChanged && _log != null)
                     _log.Info("App.Settings", "Connection settings changed to bucket '" + _settings.BucketName + "' at " + R2ClientFactory.DescribeEndpoint(_settings) + ".");
 
-                UpdateCommandStates();
-            }
+            UpdateCommandStates();
+            EventHandler handler = BackgroundActivityChanged;
+            if (handler != null) handler(this, EventArgs.Empty);
+        }
         }
 
         // ------------------------------------------------------------------ overwrite prompt
@@ -1178,26 +1191,67 @@ namespace CloudflareR2Uploader.Forms
 
         // ------------------------------------------------------------------------ closing
 
+        internal void OpenFilesPage() { ShowBucketFilesPage(); }
+
+        internal void OpenSettingsDialog() { OnSettingsClick(this, EventArgs.Empty); }
+
+        internal string GetUploadStatusText()
+        {
+            OverallProgressInfo progress = _queueService.GetOverallProgress();
+            if (_queueService.IsRunning)
+                return progress.Active + " active, " + progress.Queued + " queued";
+            if (progress.Failed > 0) return progress.Failed + " upload(s) failed";
+            return "No uploads running";
+        }
+
+        internal bool CanUploadAll { get { return uploadAllButton.Enabled; } }
+        internal bool IsUploadRunning { get { return _queueService.IsRunning; } }
+        internal bool IsUploadPaused { get { return _queueService.IsPaused; } }
+        internal void UploadAllFromTray() { if (uploadAllButton.Enabled) OnUploadAllClick(this, EventArgs.Empty); }
+        internal void TogglePauseFromTray() { if (_queueService.IsRunning) OnPauseClick(this, EventArgs.Empty); }
+
+        internal void RaiseBackgroundOperationCompleted(string message, bool failed)
+        {
+            EventHandler<BackgroundOperationEventArgs> handler = BackgroundOperationCompleted;
+            if (handler != null) handler(this, new BackgroundOperationEventArgs(message, failed));
+        }
+
+        internal bool RequestRealExit(bool windowsShutdown)
+        {
+            if (_queueService.IsRunning)
+            {
+                if (windowsShutdown) _queueService.CancelAll(true);
+                else
+                {
+                    CancelChoice choice = AskCancelChoice(true);
+                    if (choice == CancelChoice.ContinueUploading) return false;
+                    _queueService.CancelAll(choice == CancelChoice.KeepPartsForResume);
+                }
+            }
+            _allowRealClose = true;
+            return true;
+        }
+
         protected override void OnFormClosing(FormClosingEventArgs e)
         {
-            if (_queueService.IsRunning && e.CloseReason == CloseReason.UserClosing)
+            if (!_allowRealClose && e.CloseReason == CloseReason.UserClosing && _settings != null && _settings.CloseToTray)
             {
-                CancelChoice choice = AskCancelChoice(true);
-
-                if (choice == CancelChoice.ContinueUploading)
-                {
-                    e.Cancel = true;
-                    return;
-                }
-
-                _queueService.CancelAll(choice == CancelChoice.KeepPartsForResume);
+                e.Cancel = true;
+                EventHandler handler = HideToTrayRequested;
+                if (handler != null) handler(this, EventArgs.Empty);
+                return;
             }
+
+            if (!_allowRealClose && !RequestRealExit(e.CloseReason == CloseReason.WindowsShutDown || e.CloseReason == CloseReason.TaskManagerClosing))
+            { e.Cancel = true; return; }
 
             uiTimer.Stop();
 
             CancelBackgroundConnectionTest();
             CancelBrowserLoad(true);
             CancelBrowserOperation();
+            CancelBulkOperation();
+            DisposeBrowserEnhancements();
 
             // Persist the destination fields so the next session starts where this one left off.
             try
@@ -1229,5 +1283,12 @@ namespace CloudflareR2Uploader.Forms
             DisposePageTransition();
             base.OnFormClosed(e);
         }
+    }
+
+    internal sealed class BackgroundOperationEventArgs : EventArgs
+    {
+        public BackgroundOperationEventArgs(string message, bool failed) { Message = message; Failed = failed; }
+        public string Message { get; private set; }
+        public bool Failed { get; private set; }
     }
 }

@@ -6,6 +6,7 @@ using System.Threading;
 using System.Windows.Forms;
 using CloudflareR2Uploader.Forms;
 using CloudflareR2Uploader.Services;
+using CloudflareR2Uploader.Tray;
 using CloudflareR2Uploader.Utilities;
 
 namespace CloudflareR2Uploader
@@ -15,7 +16,7 @@ namespace CloudflareR2Uploader
         private static LoggingService _log;
 
         [STAThread]
-        private static void Main()
+        private static void Main(string[] args)
         {
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
@@ -50,9 +51,19 @@ namespace CloudflareR2Uploader
 
             try
             {
-                using (MainForm form = new MainForm(_log))
+                using (SingleInstanceCoordinator instance = new SingleInstanceCoordinator())
                 {
-                    Application.Run(form);
+                    if (!instance.IsFirstInstance)
+                    {
+                        instance.SignalFirstInstance();
+                        return;
+                    }
+
+                    using (TrayApplicationContext context = new TrayApplicationContext(
+                        _log, instance, SingleInstanceCoordinator.ParseArguments(args)))
+                    {
+                        Application.Run(context);
+                    }
                 }
             }
             finally
@@ -66,7 +77,11 @@ namespace CloudflareR2Uploader
         {
             try
             {
-                Version version = Assembly.GetExecutingAssembly().GetName().Version;
+                Assembly assembly = Assembly.GetExecutingAssembly();
+                AssemblyInformationalVersionAttribute informational = assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>();
+                if (informational != null && !string.IsNullOrWhiteSpace(informational.InformationalVersion))
+                    return informational.InformationalVersion;
+                Version version = assembly.GetName().Version;
                 return version == null ? "1.0" : version.ToString(3);
             }
             catch (Exception)

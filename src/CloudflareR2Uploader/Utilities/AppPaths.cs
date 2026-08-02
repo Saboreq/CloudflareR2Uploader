@@ -42,6 +42,12 @@ namespace CloudflareR2Uploader.Utilities
 
         public static string LogDirectory { get { return Path.Combine(Root, "Logs"); } }
 
+        public static string PreviewCacheDirectory { get { return Path.Combine(Root, "PreviewCache"); } }
+
+        public static string WebView2DataDirectory { get { return Path.Combine(Root, "WebView2"); } }
+
+        public static string UpdateDirectory { get { return Path.Combine(Root, "Updates"); } }
+
         public static void EnsureDirectory(string path)
         {
             if (string.IsNullOrEmpty(path)) return;
@@ -53,6 +59,9 @@ namespace CloudflareR2Uploader.Utilities
             EnsureDirectory(Root);
             EnsureDirectory(UploadStateDirectory);
             EnsureDirectory(LogDirectory);
+            EnsureDirectory(PreviewCacheDirectory);
+            EnsureDirectory(WebView2DataDirectory);
+            EnsureDirectory(UpdateDirectory);
         }
     }
 }

@@ -63,6 +63,8 @@ namespace CloudflareR2Uploader.Forms
             _settingsService = settingsService;
             _credentialService = credentialService;
             _connectionTester = new R2ConnectionTester(log);
+            _startupRegistration = new StartupRegistrationService(log);
+            CreateApplicationBehaviorControls();
 
             Icon = Program.LoadApplicationIcon();
 
@@ -281,6 +283,7 @@ namespace CloudflareR2Uploader.Forms
 
         private void LoadValues(AppSettings settings, R2Credentials credentials)
         {
+            LoadApplicationBehaviorValues(settings);
             accountIdTextBox.Text = settings.AccountId;
             bucketTextBox.Text = settings.BucketName;
             endpointTextBox.Text = settings.CustomEndpoint;
@@ -488,6 +491,7 @@ namespace CloudflareR2Uploader.Forms
             settings.ParallelParts = (int)parallelNumeric.Value;
             settings.RetryAttempts = (int)retryNumeric.Value;
             settings.RememberCredentials = rememberCheckBox.Checked;
+            ApplyApplicationBehaviorValues(settings);
             settings.Clamp();
 
             return settings;
@@ -597,6 +601,18 @@ namespace CloudflareR2Uploader.Forms
                 return;
             }
 
+            string startupError;
+            bool actualStartup = _startupRegistration.IsEnabled(Application.ExecutablePath);
+            if (settings.StartWithWindows != actualStartup &&
+                !_startupRegistration.SetEnabled(settings.StartWithWindows, Application.ExecutablePath, out startupError))
+            {
+                settings.StartWithWindows = actualStartup;
+                _startWithWindowsCheckBox.Checked = actualStartup;
+                ErrorDialog.Show(this, "Start with Windows could not be updated", startupError, null);
+                return;
+            }
+
+            settings.StartWithWindows = _startupRegistration.IsEnabled(Application.ExecutablePath);
             if (!_settingsService.Save(settings))
             {
                 ErrorDialog.Show(this, "The settings could not be saved",

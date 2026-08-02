@@ -572,7 +572,7 @@ namespace CloudflareR2Uploader.Forms
             this.browserGrid.Dock = System.Windows.Forms.DockStyle.Fill;
             this.browserGrid.EnableHeadersVisualStyles = false;
             this.browserGrid.Location = new System.Drawing.Point(14, 66);
-            this.browserGrid.MultiSelect = false;
+            this.browserGrid.MultiSelect = true;
             this.browserGrid.Name = "browserGrid";
             this.browserGrid.ReadOnly = true;
             this.browserGrid.RowHeadersVisible = false;

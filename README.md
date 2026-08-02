@@ -1,166 +1,154 @@
 # Cloudflare R2 Uploader
 
-Cloudflare R2 Uploader is a Windows Forms desktop client for uploading files and
-folders directly to a Cloudflare R2 bucket through the S3-compatible API. It
-supports single-request uploads for smaller files and controlled, resumable
-multipart uploads for large and multi-gigabyte files.
+[![CI](https://github.com/Saboreq/CloudflareR2Uploader/actions/workflows/ci.yml/badge.svg)](https://github.com/Saboreq/CloudflareR2Uploader/actions/workflows/ci.yml)
+[![Releases](https://img.shields.io/github/v/release/Saboreq/CloudflareR2Uploader)](https://github.com/Saboreq/CloudflareR2Uploader/releases)
 
-## Requirements
+Cloudflare R2 Uploader is a Windows desktop client for uploading, browsing, previewing, downloading, and managing objects through Cloudflare R2's S3-compatible API. It keeps credentials protected with Windows DPAPI and supports resumable multipart uploads without a Worker, mounted drive, or background service.
 
-- Windows 10 or Windows 11
-- Microsoft .NET Framework 4.8 on the machine that runs the application
-- Visual Studio 2022 or newer with the **.NET desktop development** workload and
-  the .NET Framework 4.8 targeting pack to build the solution
-- A Cloudflare account, an R2 bucket, and bucket-scoped R2 S3 credentials
+![Cloudflare R2 Uploader main window](artifacts/cloudflare-r2-uploader.png)
 
-No Worker, command-line upload tool, external UI framework, or installation
-service is used for uploads.
+## Highlights
 
-## Build the solution
+- Multiple bucket profiles with separate DPAPI-protected credentials.
+- Single-part and bounded parallel multipart uploads with pause, resume, cancel, retry, overwrite policies, and post-upload verification.
+- Paginated object browser with virtual-folder navigation, multi-selection, current-page filtering, stable typed sorting, and keyboard shortcuts.
+- Preflighted bulk downloads and permanent bulk deletion for mixed file/folder selections, including overlap deduplication and cancellation.
+- Public URL copying, temporary SigV4 download links, rich local Preview, and complete Properties metadata.
+- Tray-owned background lifetime, close/minimize-to-tray, per-user Start with Windows, and single-instance activation.
+- Per-user installer and consent-based HTTPS updates verified by exact size and SHA-256.
 
-Open `CloudflareR2Uploader.sln` in Visual Studio, select `Release | Any CPU`,
-then choose **Build > Rebuild Solution**.
+## Supported Windows and requirements
 
-From PowerShell, the complete build, test, and distribution step is:
+- Windows 10 or Windows 11.
+- .NET Framework 4.8.
+- A Cloudflare account, R2 bucket, and bucket-scoped R2 S3 credentials.
+- Microsoft Edge WebView2 Evergreen Runtime for PDF/rich WebView2 previews. WebView2 is optional for uploads, browsing, text/image previews, and Properties; the application remains usable when the runtime is absent.
 
-```powershell
-.\build\Build-Release.ps1
-```
+## Install
 
-The script uses the newest Visual Studio MSBuild found by `vswhere.exe`, restores
-NuGet packages, rebuilds Release, runs the MSTest suite, and copies the woven
-single-file application to:
+Download `CloudflareR2Uploader-v<VERSION>-Setup.exe` from [GitHub Releases](https://github.com/Saboreq/CloudflareR2Uploader/releases) and run it. The Inno Setup wizard installs the application for the current Windows account under `%LocalAppData%\Programs\CloudflareR2Uploader`, creates a desktop shortcut by default, adds Start menu and Windows Apps uninstall entries, handles in-use application files during upgrades, and can open the app when finished.
+
+Administrator rights are not required. Application settings, protected credentials, logs, caches, and resumable state remain outside the install directory, so upgrading or uninstalling binaries does not overwrite user data.
+
+## Create Cloudflare R2 credentials
+
+1. Open Cloudflare Dashboard, select **R2 object storage**, and create or select a bucket.
+2. Open **Manage R2 API Tokens** and create bucket-scoped S3 credentials.
+3. Grant Object Read for browsing, downloading, metadata, previews, overwrite checks, resume, and verification. Grant Object Write for uploads, folders, copy/move/rename, overwrite, and deletion.
+4. Copy the generated Access Key ID and Secret Access Key when Cloudflare displays them. These differ from a normal dashboard API token.
+5. Copy the Account ID from the R2 or account overview.
+
+In Settings, add a bucket profile, enter its account, bucket, and credentials, optionally set a custom HTTPS endpoint and PublicBaseUrl, then test and save. The bucket selector switches profiles without rebuilding the queue. Credentials never enter `settings.json`.
+
+## Uploads and multipart resume
+
+Drop files or folders onto Upload, or use **Browse files** and **Browse folder**. Choose a destination prefix, folder-structure behavior, and overwrite policy. Smaller files stream through one PUT; larger files use bounded parallel multipart requests. Confirmed part ETags are stored under local upload state so compatible uploads can resume after cancellation or restart.
+
+Pause stops scheduling new work while in-flight parts finish. Cancellation can keep resumable parts or abort them. R2 folders are key prefixes, not real directories.
+
+## Browse, select, filter, and sort
+
+Open **Files** to list up to 250 rows per server page. Previous/Next use R2 continuation tokens. Double-click opens a folder only when exactly one folder is selected.
+
+Use Ctrl/Shift selection or Ctrl+A. Right-click follows Explorer selection conventions. The filter searches only the loaded page by name, key/prefix, type, and extension; it does not issue a request per keystroke. Column headers sort the loaded page on typed name, type, size, or modified values, always keeping folders first. Sort and details layout persist, while filter text does not.
+
+Useful shortcuts include Delete, Ctrl+C for keys, Ctrl+Shift+C for public URLs, Ctrl+D to download, Ctrl+F to filter, Escape to clear the filter/selection, Enter to open one folder, F5 to refresh, and Backspace for the parent prefix.
+
+## Bulk downloads and deletion
+
+Bulk and folder downloads recursively enumerate selected prefixes before confirmation, follow every continuation token, deduplicate overlaps, calculate known totals, and map keys to safe Windows paths. Downloads use three workers, stream to `.r2partial`, verify known lengths, then rename into place. Conflicts can be overwritten, skipped, or deterministically renamed while preserving extensions.
+
+Bulk deletion performs the same recursive preflight and reports the visible row count separately from the unique R2 objects affected. Delete is permanent; there is no Trash. Folder rename/move and other prefix operations can copy many objects before deleting originals.
+
+## Public and temporary URLs
+
+Public URLs are constructed locally from the profile's PublicBaseUrl and encoded object key. Configuring PublicBaseUrl does not make a private bucket or object public. Folder selections are ignored because prefixes do not have public object URLs.
+
+Temporary download links are HTTPS SigV4 GET bearer tokens generated locally for 15 minutes through seven days. Anyone holding a link can access the object until expiry. Links are not saved, logged, or added to history.
+
+## Preview and Properties
+
+The details area has Preview and Properties tabs and can be hidden. Selection changes are debounced and stale async results are rejected.
+
+Text, JSON, XML, CSV, Markdown, source/config/log files, common images, and PDF are supported within bounded limits. JSON is pretty-printed; XML disables DTD and external entities. HTML and SVG are shown as source and never executed. Preview data downloads through the authenticated SDK to a randomized session directory; WebView2 never navigates to signed or public R2 URLs and blocks remote navigation/popups. Very large objects are not previewed.
+
+Properties shows standard object headers, ETag, timestamps, endpoint/profile context, sorted custom metadata, optional extracted image metadata, and link actions. Folder properties deliberately avoid inventing size, modified time, or object counts.
+
+## Tray, background operation, and startup
+
+Closing the window hides it by default; it does not exit or dispose the upload queue. Minimize-to-tray is also enabled by default. Use the tray icon to open/hide the app, view upload status, upload, pause/resume, open Files or Settings, open logs, toggle Start with Windows, or **Exit**. Exit performs the real teardown and prompts about active multipart uploads. Aggregate notifications avoid exposing object names.
+
+Start with Windows writes only this quoted command under the current user's Run key and needs no administrator rights:
 
 ```text
-dist\CloudflareR2Uploader.exe
+"C:\path\to\CloudflareR2Uploader.exe" --background
 ```
 
-Fody and Costura.Fody embed the managed AWS SDK dependencies into the
-application. The `dist` directory does not need AWSSDK DLLs, configuration
-files, JSON files, images, or PDB files beside the executable.
+A per-user named mutex and pipe ensure a second launch activates the existing window. `--show` requests the normal UI; unknown arguments are ignored safely.
 
-## Create the correct Cloudflare credentials
+## Updates
 
-1. Open the Cloudflare dashboard and select **R2 object storage**.
-2. Create or select the destination bucket.
-3. Open **Manage R2 API Tokens** and create a token with **Object Read & Write**
-   permission scoped to that bucket. Read access is needed for connection tests,
-   overwrite checks, multipart resumption, and post-upload verification.
-4. Copy the generated **Access Key ID** and **Secret Access Key** when Cloudflare
-   displays them.
-5. Find the **Account ID** on the R2 overview page or the account overview page.
+Installer builds can contain a publisher-configured HTTPS manifest URL. When automatic checks are enabled, the app checks once after startup. If a higher SemVer release exists, it shows the version, size, and release notes and asks whether to update. Selecting **Not now** changes nothing. Selecting **Update now** downloads the setup EXE, verifies the manifest-declared byte length and SHA-256, asks before interrupting active uploads, then runs the installer and restarts the app.
 
-The Access Key ID and Secret Access Key are the S3 credentials derived from an
-R2 API token. They are not the normal Cloudflare dashboard API token string.
-Pasting the dashboard token into either credential field will not authenticate
-to the S3-compatible endpoint.
-
-Cloudflare documentation:
-
-- [R2 API tokens](https://developers.cloudflare.com/r2/api/tokens/)
-- [Use the S3-compatible API](https://developers.cloudflare.com/r2/get-started/s3/)
-- [AWS SDK for .NET example](https://developers.cloudflare.com/r2/examples/aws/aws-sdk-net/)
-
-## Configure and use the application
-
-1. Run `CloudflareR2Uploader.exe` and open **Settings**.
-2. Enter the Account ID, Access Key ID, Secret Access Key, and exact bucket name.
-3. Normally leave **Custom endpoint** empty. The application derives:
-   `https://{ACCOUNT_ID}.r2.cloudflarestorage.com`.
-4. Optionally enter a public or custom domain. It is used only to display a final
-   URL; it does not make a private object public.
-5. Choose whether Windows should remember the credentials, then select
-   **Test connection** and **Save**.
-6. Drop files or folders on the upload area, or use the browse buttons.
-7. Set the destination prefix, folder-structure behavior, and overwrite policy,
-   then select **Upload all**.
-
-Uploading remains disabled until the current bucket and credentials pass the
-connection test. The test reads at most one object entry from the configured
-bucket and does not require account-wide bucket-list permission.
-
-## Browse and manage bucket files
-
-Select **Files** below the application header to browse the currently selected
-bucket without opening another window. Switching between Upload and Files uses
-a short transition while preserving both pages and the upload queue in memory.
-
-Folders shown by the browser are virtual prefixes separated by `/`; R2 does not
-store real directories. Listings contain at most 250 entries per page. Use
-**Previous** and **Next** to move through the continuation-token pages, and use
-**Refresh** when recent uploads are not yet shown. **New folder** creates an
-empty virtual folder in the current location by storing a zero-byte folder
-marker whose key ends in `/`.
-
-Right-click an object to download it, overwrite it from a local file, copy it,
-rename it, move it to another key, or delete it. Right-click a virtual folder to
-rename, copy, move, or recursively delete every object under that prefix.
-Renaming refuses to replace an existing file or folder and uses the same safe
-copy-then-delete behavior as Move. **Copy** stores an
-in-application clipboard entry; **Paste** copies it into the current or selected
-folder and chooses a non-conflicting `- Copy` name when necessary. The clipboard
-is cleared when the bucket profile changes.
-
-Move is implemented safely as copy-then-delete: the source is not removed until
-all copies complete and their sizes are verified. Large objects use multipart
-server-side copy. Folder moves can merge with an existing destination prefix,
-so the confirmation describes that behavior before any request is sent.
-
-Listing and downloading require **Object Read** permission. New folder, rename,
-overwrite, copy, move, and delete require **Object Read & Write** permission. Delete operations
-are permanent and always show a confirmation. Selecting a row does not alter
-the normal upload destination, and double-clicking a file still performs no
-network operation.
-
-## Multipart uploads and resumption
-
-Files below the configured threshold use one streaming `PutObject` request.
-Files at or above the threshold use the low-level multipart API:
-
-1. initiate the multipart upload;
-2. upload bounded file ranges in parallel;
-3. save each confirmed part number and ETag;
-4. complete only when every part is present and the source file is unchanged;
-5. verify the final object length with a metadata request.
-
-Defaults are a 100 MiB threshold, 64 MiB parts, four parallel parts, and five
-attempts per operation. Part size grows automatically when necessary to remain
-under the 10,000-part limit. Every upload request disables the AWS SDK streaming
-payload-signing and default-checksum flow required for Cloudflare R2, and the
-application refuses non-HTTPS endpoints.
-
-Pause stops scheduling new multipart parts and new files. Parts already in
-flight finish so their ETags can be saved. A single in-flight `PutObject` request
-cannot be paused safely, so it finishes while the queue remains paused before
-the next file. Cancellation lets you keep multipart parts for later resumption
-or abort and remove the incomplete upload.
+Updates are never installed silently. Automatic checks can be disabled in Settings, and **Check for updates...** is available from the tray menu. See [deploy/README.md](deploy/README.md) for the dedicated Cloudflare R2 bucket, custom-domain, immutable installer, and manifest-last publishing setup.
 
 ## Local data and security
 
-Runtime data is stored under:
+Runtime data stays under `%LocalAppData%\CloudflareR2Uploader\`:
 
-```text
-%LocalAppData%\CloudflareR2Uploader\
+- `settings.json`: non-secret preferences and profiles.
+- `credentials.bin`: optional current-user DPAPI-protected credentials.
+- `UploadState\`: resumable multipart state without credentials.
+- `Logs\`: sanitized diagnostics.
+- `PreviewCache\`: bounded temporary object copies, cleaned best-effort on exit/startup.
+- `WebView2\`: dedicated browser user data.
+- `Updates\`: verified setup downloads, pruned automatically.
+
+Preview cache content can contain private object data. Protect the Windows account and disk accordingly. Credentials, authorization headers, signed URL query strings, and preview contents are excluded from normal logs and release packages.
+
+## Build, test, and package locally
+
+Install Visual Studio 2022 with the .NET desktop development workload and .NET Framework 4.8 targeting pack, plus Inno Setup 6 or 7. The solution remains legacy non-SDK C# 7.3. Pass a nonstandard compiler location with `-InnoSetupCompiler <path-to-ISCC.exe>`.
+
+Run the full restore, Release rebuild, MSTest suite, payload validation, and single-EXE installer build:
+
+```powershell
+.\build\Build-Release.ps1 -Version 1.2.3
 ```
 
-- `settings.json` contains non-secret application settings.
-- `credentials.dat` contains the Access Key ID and Secret Access Key only when
-  remembering is enabled. Windows DPAPI encrypts it for the current user.
-- `UploadState\` contains resumable multipart metadata and never credentials.
-- `Logs\` contains sanitized daily logs.
+Options include `-SkipTests`, `-Configuration Debug|Release`, `-OutputDirectory <path>`, `-KeepStaging`, `-UpdateBaseUrl <https-url>`, `-UpdatePrefix <path>`, and `-InnoSetupCompiler <path>`. Test results are written as TRX under `TestResults`. The only release file is the Inno installer `CloudflareR2Uploader-v<VERSION>-Setup.exe`.
 
-Disabling **Remember credentials** prevents a leftover encrypted blob from being
-loaded. The settings window also offers to remove it from disk. Secrets,
-authorization headers, signed URLs, and encrypted credential blobs are not
-written to logs or technical error reports.
+For an update-enabled production build, use the same public base URL and prefix that will be published to R2:
 
-## Tests
+```powershell
+.\build\Build-Release.ps1 -Version 1.2.3 -UpdateBaseUrl https://downloads.example.com
+```
 
-The automated suite covers object keys and duplicate names, browser paths,
-response mapping and continuation-token history, multipart sizing and part
-limits, progress calculations, formatting, MIME detection, transient error
-classification, retry delays, settings and resume-state JSON, DPAPI encryption,
-path handling, UI construction, and the AWS SDK configuration contract.
+## GitHub automation and publishing
 
-The suite does not perform a live R2 upload. A live integration check requires
-the operator's own bucket and valid R2 S3 credentials.
+`.github/workflows/ci.yml` runs the complete Windows build/test/package path for main pushes, pull requests, and manual runs without R2 credentials. `.github/workflows/release.yml` validates tags, runs the same gates, preserves prerelease informational versions, and creates a GitHub Release using only the repository-provided token.
+
+Publish a reviewed release with:
+
+```powershell
+git tag v1.2.3
+git push origin v1.2.3
+```
+
+See [docs/RELEASING.md](docs/RELEASING.md) for release verification and failure handling.
+
+## Troubleshooting and known limits
+
+- **Not configured:** add and test a bucket profile with complete R2 S3 credentials.
+- **PDF preview unavailable:** install WebView2 Evergreen Runtime; other app features continue working.
+- **Access denied:** add Object Read and/or Object Write permission required by the attempted operation.
+- **Startup path stale:** open Settings and save with Start with Windows enabled.
+- **Updates not configured:** build with `-UpdateBaseUrl`, or use the Cloudflare publisher script so setup embeds the manifest location.
+- Filters and sorting affect only the current server page. There is no drive mounting, WebDAV, Trash, version browser, or server-side full-bucket search.
+- Live R2 behavior depends on the user's endpoint, credentials, permissions, object sizes, and network. CI uses no real credentials and performs no Cloudflare integration calls.
+
+## Contributing, security, components, and license status
+
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing the legacy projects. Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Direct dependencies and licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+
+This repository currently contains no application `LICENSE` file, so no application license is asserted here. Third-party components retain their own licenses.

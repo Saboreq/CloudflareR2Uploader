@@ -51,6 +51,17 @@ namespace CloudflareR2Uploader.Models
             LogRetentionDays = 14;
             BucketProfiles = new List<R2BucketProfile>();
             ActiveBucketProfileId = string.Empty;
+            BrowserSortColumnValue = (int)BrowserSortColumn.Name;
+            BrowserSortDirectionValue = (int)BrowserSortDirection.Ascending;
+            DetailsPanelVisible = true;
+            DetailsPanelWidth = 360;
+            DetailsSelectedTab = 0;
+            CloseToTray = true;
+            MinimizeToTray = true;
+            StartWithWindows = false;
+            StartMinimized = false;
+            ShowTrayNotifications = true;
+            CheckForUpdatesAutomatically = true;
         }
 
         [DataMember(Name = "accountId", Order = 1)]
@@ -109,6 +120,51 @@ namespace CloudflareR2Uploader.Models
         [DataMember(Name = "activeBucketProfileId", Order = 15)]
         public string ActiveBucketProfileId { get; set; }
 
+        [DataMember(Name = "browserSortColumn", Order = 16)]
+        public int BrowserSortColumnValue { get; set; }
+
+        [DataMember(Name = "browserSortDirection", Order = 17)]
+        public int BrowserSortDirectionValue { get; set; }
+
+        [DataMember(Name = "detailsPanelVisible", Order = 18)]
+        public bool DetailsPanelVisible { get; set; }
+
+        [DataMember(Name = "detailsPanelWidth", Order = 19)]
+        public int DetailsPanelWidth { get; set; }
+
+        [DataMember(Name = "detailsSelectedTab", Order = 20)]
+        public int DetailsSelectedTab { get; set; }
+
+        [DataMember(Name = "closeToTray", Order = 21)]
+        public bool CloseToTray { get; set; }
+
+        [DataMember(Name = "minimizeToTray", Order = 22)]
+        public bool MinimizeToTray { get; set; }
+
+        [DataMember(Name = "startWithWindows", Order = 23)]
+        public bool StartWithWindows { get; set; }
+
+        [DataMember(Name = "startMinimized", Order = 24)]
+        public bool StartMinimized { get; set; }
+
+        [DataMember(Name = "showTrayNotifications", Order = 25)]
+        public bool ShowTrayNotifications { get; set; }
+
+        [DataMember(Name = "checkForUpdatesAutomatically", Order = 26)]
+        public bool CheckForUpdatesAutomatically { get; set; }
+
+        public BrowserSortColumn BrowserSortColumn
+        {
+            get { return Enum.IsDefined(typeof(BrowserSortColumn), BrowserSortColumnValue) ? (BrowserSortColumn)BrowserSortColumnValue : BrowserSortColumn.Name; }
+            set { BrowserSortColumnValue = (int)value; }
+        }
+
+        public BrowserSortDirection BrowserSortDirection
+        {
+            get { return Enum.IsDefined(typeof(BrowserSortDirection), BrowserSortDirectionValue) ? (BrowserSortDirection)BrowserSortDirectionValue : BrowserSortDirection.Ascending; }
+            set { BrowserSortDirectionValue = (int)value; }
+        }
+
         public OverwriteBehavior OverwriteBehavior
         {
             get
@@ -157,6 +213,12 @@ namespace CloudflareR2Uploader.Models
 
             if (!Enum.IsDefined(typeof(OverwriteBehavior), OverwriteBehaviorValue))
                 OverwriteBehaviorValue = (int)OverwriteBehavior.Ask;
+            if (!Enum.IsDefined(typeof(BrowserSortColumn), BrowserSortColumnValue))
+                BrowserSortColumnValue = (int)BrowserSortColumn.Name;
+            if (!Enum.IsDefined(typeof(BrowserSortDirection), BrowserSortDirectionValue))
+                BrowserSortDirectionValue = (int)BrowserSortDirection.Ascending;
+            DetailsPanelWidth = Clamp(DetailsPanelWidth, 240, 700, 360);
+            if (DetailsSelectedTab < 0 || DetailsSelectedTab > 1) DetailsSelectedTab = 0;
 
             NormalizeBucketProfiles();
         }
@@ -287,6 +349,17 @@ namespace CloudflareR2Uploader.Models
                 OverwriteBehaviorValue = OverwriteBehaviorValue,
                 LogRetentionDays = LogRetentionDays,
                 ActiveBucketProfileId = ActiveBucketProfileId,
+                BrowserSortColumnValue = BrowserSortColumnValue,
+                BrowserSortDirectionValue = BrowserSortDirectionValue,
+                DetailsPanelVisible = DetailsPanelVisible,
+                DetailsPanelWidth = DetailsPanelWidth,
+                DetailsSelectedTab = DetailsSelectedTab,
+                CloseToTray = CloseToTray,
+                MinimizeToTray = MinimizeToTray,
+                StartWithWindows = StartWithWindows,
+                StartMinimized = StartMinimized,
+                ShowTrayNotifications = ShowTrayNotifications,
+                CheckForUpdatesAutomatically = CheckForUpdatesAutomatically,
                 BucketProfiles = new List<R2BucketProfile>()
             };
 

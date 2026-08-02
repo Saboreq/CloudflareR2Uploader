@@ -1,0 +1,51 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-test-package:
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: microsoft/setup-msbuild@v2
+      - uses: NuGet/setup-nuget@v2
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Restore, build, test, and package
+        shell: pwsh
+        env:
+          BUILD_VERSION: 0.0.0-ci.${{ github.run_number }}
+          UPDATE_BASE_URL: ${{ vars.UPDATE_BASE_URL }}
+          UPDATE_PREFIX: ${{ vars.UPDATE_PREFIX }}
+        run: |
+          $arguments = @('-Version', $env:BUILD_VERSION)
+          if ($env:UPDATE_BASE_URL) { $arguments += @('-UpdateBaseUrl', $env:UPDATE_BASE_URL) }
+          if ($env:UPDATE_PREFIX) { $arguments += @('-UpdatePrefix', $env:UPDATE_PREFIX) }
+          & .\build\Build-Release.ps1 @arguments
+      - name: Upload release package
+        if: success()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cloudflare-r2-uploader-windows
+          path: dist/CloudflareR2Uploader-v*-Setup.exe
+          if-no-files-found: error
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: test-results
+          path: TestResults/*.trx
+          if-no-files-found: error

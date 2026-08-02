@@ -328,49 +328,15 @@ namespace CloudflareR2Uploader.Forms
 
         private void ApplyBrowserPage(R2BrowserPage page)
         {
-            browserGrid.Rows.Clear();
-
-            foreach (R2BrowserItem item in page.Items)
-            {
-                string type = item.IsFolder ? "Folder" : GetBrowserFileType(item.DisplayName);
-                string size = item.IsFolder ? string.Empty : FileSizeFormatter.Format(item.Size);
-                string modified = item.LastModifiedUtc.HasValue
-                    ? item.LastModifiedUtc.Value.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)
-                    : string.Empty;
-
-                int rowIndex = browserGrid.Rows.Add(item.DisplayName, type, size, modified);
-                browserGrid.Rows[rowIndex].Tag = item;
-            }
+            _browserPageItems.Clear();
+            foreach (R2BrowserItem item in page.Items) _browserPageItems.Add(item.Clone());
 
             _browserPagination.SetNextContinuationToken(
                 page.IsTruncated && !string.IsNullOrEmpty(page.NextContinuationToken)
                     ? page.NextContinuationToken
                     : null);
 
-            if (page.Items.Count == 0)
-            {
-                ShowBrowserState(
-                    page.Prefix.Length == 0 ? "This bucket is empty" : "This folder is empty",
-                    page.Prefix.Length == 0
-                        ? "No objects or virtual folders are present on this page."
-                        : "No objects or child prefixes are present on this page.",
-                    false);
-            }
-            else
-            {
-                browserStateLabel.Visible = false;
-                browserGrid.Visible = true;
-                browserGrid.ClearSelection();
-            }
-
-            browserStatusLabel.Text = string.Format(
-                CultureInfo.CurrentCulture,
-                "{0} {1} and {2} {3} on this page | Page {4}",
-                page.FolderCount,
-                page.FolderCount == 1 ? "folder" : "folders",
-                page.FileCount,
-                page.FileCount == 1 ? "file" : "files",
-                _browserPagination.PageIndex + 1);
+            ApplyBrowserView(false);
         }
 
         private static string GetBrowserFileType(string displayName)
@@ -412,8 +378,9 @@ namespace CloudflareR2Uploader.Forms
 
         private void OpenSelectedBrowserFolder()
         {
-            if (browserGrid.SelectedRows.Count == 0) return;
-            R2BrowserItem item = browserGrid.SelectedRows[0].Tag as R2BrowserItem;
+            List<R2BrowserItem> selection = GetSelectedBrowserItems();
+            if (selection.Count != 1) return;
+            R2BrowserItem item = selection[0];
             if (item == null || !item.IsFolder) return;
 
             NavigateBrowserTo(item.Prefix, true);
@@ -467,6 +434,7 @@ namespace CloudflareR2Uploader.Forms
             if (_browserPagination.Prefix.Length == 0)
                 _browserPagination.Reset(string.Empty);
             _browserNeedsRefresh = true;
+            InvalidateBrowserDetails();
             BeginBrowserLoad();
         }
 
@@ -499,6 +467,8 @@ namespace CloudflareR2Uploader.Forms
         private void ResetBrowserForTargetChange()
         {
             CancelBrowserLoad(false);
+            CancelBulkOperation();
+            InvalidateBrowserDetails();
             ClearBrowserClipboardForTargetChange();
             _browserPagination.Reset(string.Empty);
             _browserBackHistory.Clear();
@@ -514,6 +484,7 @@ namespace CloudflareR2Uploader.Forms
 
         private void MarkBrowserNeedsRefresh()
         {
+            InvalidateBrowserDetails();
             _browserContentVersion++;
             _browserNeedsRefresh = true;
 
@@ -544,8 +515,10 @@ namespace CloudflareR2Uploader.Forms
 
         private void ClearBrowserRows()
         {
+            _browserPageItems.Clear();
             browserGrid.Rows.Clear();
             browserGrid.ClearSelection();
+            CancelDetailsLoad();
         }
 
         private void ShowBrowserState(string headline, string detail, bool isError)
@@ -582,7 +555,9 @@ namespace CloudflareR2Uploader.Forms
 
         private bool HandleBrowserShortcut(KeyEventArgs e)
         {
-            if (!_browserPageActive || IsBrowserTextEntryControl(ActiveControl)) return false;
+            if (!_browserPageActive) return false;
+            bool filterFocused = _browserFilterTextBox != null && (_browserFilterTextBox.Focused || _browserFilterTextBox.ContainsFocus);
+            if (IsBrowserTextEntryControl(ActiveControl) && !filterFocused) return false;
 
             if (e.Alt && e.KeyCode == Keys.U)
             {
@@ -596,7 +571,27 @@ namespace CloudflareR2Uploader.Forms
                 return true;
             }
 
+            if (e.Control && e.KeyCode == Keys.F)
+            {
+                _browserFilterTextBox.Focus(); _browserFilterTextBox.SelectAll(); return true;
+            }
+
+            if (e.KeyCode == Keys.Escape)
+            {
+                if (_browserFilterTextBox.Text.Length > 0) _browserFilterTextBox.Text = string.Empty;
+                else browserGrid.ClearSelection();
+                return true;
+            }
+
+            if (filterFocused) return false;
+
             if (!browserGrid.ContainsFocus) return false;
+
+            if (e.Control && e.KeyCode == Keys.A) { browserGrid.SelectAll(); return true; }
+            if (e.Control && e.Shift && e.KeyCode == Keys.C) { CopySelectedPublicUrls(); return true; }
+            if (e.Control && e.KeyCode == Keys.C) { CopySelectedObjectKeys(); return true; }
+            if (e.Control && e.KeyCode == Keys.D) { _ = DownloadSelectedBrowserItemsAsync(); return true; }
+            if (e.KeyCode == Keys.Delete) { _ = DeleteSelectedBrowserItemsAsync(); return true; }
 
             if (e.KeyCode == Keys.Back)
             {

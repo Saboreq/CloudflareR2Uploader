@@ -9,6 +9,19 @@ namespace CloudflareR2Uploader.Tests
     public sealed class SettingsServiceTests
     {
         [TestMethod]
+        public void NewSettings_DefaultClampAndCloneIncludeReleasePreferences()
+        {
+            AppSettings settings = new AppSettings { BrowserSortColumnValue = 99, BrowserSortDirectionValue = 99, DetailsPanelWidth = 9999, DetailsSelectedTab = 99 };
+            settings.Clamp();
+            Assert.AreEqual(BrowserSortColumn.Name, settings.BrowserSortColumn);
+            Assert.AreEqual(BrowserSortDirection.Ascending, settings.BrowserSortDirection);
+            Assert.AreEqual(700, settings.DetailsPanelWidth);
+            Assert.AreEqual(0, settings.DetailsSelectedTab);
+            Assert.IsTrue(settings.CloseToTray); Assert.IsTrue(settings.MinimizeToTray);
+            Assert.IsTrue(settings.CheckForUpdatesAutomatically);
+            AppSettings clone = settings.Clone(); Assert.AreEqual(settings.DetailsPanelWidth, clone.DetailsPanelWidth); Assert.AreEqual(settings.ShowTrayNotifications, clone.ShowTrayNotifications); Assert.AreEqual(settings.CheckForUpdatesAutomatically, clone.CheckForUpdatesAutomatically);
+        }
+        [TestMethod]
         public void SaveAndLoad_RoundTripsNonSecretSettingsOnly()
         {
             using (TemporaryDirectory directory = new TemporaryDirectory())

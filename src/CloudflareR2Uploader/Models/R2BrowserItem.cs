@@ -12,5 +12,24 @@ namespace CloudflareR2Uploader.Models
         public long Size { get; set; }
         public DateTime? LastModifiedUtc { get; set; }
         public string ETag { get; set; }
+
+        public string Identity
+        {
+            get { return IsFolder ? (Prefix ?? string.Empty) : (Key ?? string.Empty); }
+        }
+
+        public R2BrowserItem Clone()
+        {
+            return new R2BrowserItem
+            {
+                Key = Key,
+                DisplayName = DisplayName,
+                Prefix = Prefix,
+                IsFolder = IsFolder,
+                Size = Size,
+                LastModifiedUtc = LastModifiedUtc,
+                ETag = ETag
+            };
+        }
     }
 }

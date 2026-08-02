@@ -1,8 +1,10 @@
 using System;
 using System.ComponentModel;
+using System.Collections.Generic;
 using System.Drawing;
 using System.Globalization;
 using System.IO;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
@@ -27,6 +29,10 @@ namespace CloudflareR2Uploader.Forms
         private ToolStripMenuItem _contextRenameItem;
         private ToolStripMenuItem _contextMoveItem;
         private ToolStripMenuItem _contextDeleteItem;
+        private ToolStripMenuItem _contextCopyKeysItem;
+        private ToolStripMenuItem _contextCopyPublicUrlsItem;
+        private ToolStripMenuItem _contextOpenPublicUrlItem;
+        private ToolStripMenuItem _contextTemporaryUrlItem;
         private ToolStripMenuItem _contextRefreshItem;
         private ToolStripSeparator _contextObjectActionsSeparator;
         private BrowserClipboardEntry _browserClipboard;
@@ -67,6 +73,10 @@ namespace CloudflareR2Uploader.Forms
             _contextDeleteItem = CreateContextItem("Delete...", OnContextDeleteClick);
             _contextDeleteItem.Name = "browserDeleteMenuItem";
             _contextDeleteItem.ForeColor = Theme.Error;
+            _contextCopyKeysItem = CreateContextItem("Copy object key(s)", (s, e) => CopySelectedObjectKeys());
+            _contextCopyPublicUrlsItem = CreateContextItem("Copy public URL(s)", (s, e) => CopySelectedPublicUrls());
+            _contextOpenPublicUrlItem = CreateContextItem("Open public URL", (s, e) => OpenSelectedPublicUrl());
+            _contextTemporaryUrlItem = CreateContextItem("Create temporary link...", (s, e) => ShowPresignedUrlForSelection());
             _contextRefreshItem = CreateContextItem("Refresh", OnBrowserRefreshClick);
             _contextRefreshItem.Name = "browserContextRefreshMenuItem";
             _contextObjectActionsSeparator = new ToolStripSeparator();
@@ -76,6 +86,10 @@ namespace CloudflareR2Uploader.Forms
                 _contextOpenItem,
                 _contextDownloadItem,
                 _contextOverwriteItem,
+                _contextCopyKeysItem,
+                _contextCopyPublicUrlsItem,
+                _contextOpenPublicUrlItem,
+                _contextTemporaryUrlItem,
                 _contextObjectActionsSeparator,
                 _contextCopyItem,
                 _contextPasteItem,
@@ -90,6 +104,7 @@ namespace CloudflareR2Uploader.Forms
             browserGrid.ContextMenuStrip = _browserContextMenu;
             browserStateLabel.ContextMenuStrip = _browserContextMenu;
             browserGrid.CellMouseDown += OnBrowserGridCellMouseDown;
+            InitializeBulkActions();
         }
 
         private static ToolStripMenuItem CreateContextItem(string text, EventHandler handler)
@@ -110,8 +125,11 @@ namespace CloudflareR2Uploader.Forms
 
             if (e.RowIndex >= 0 && e.RowIndex < browserGrid.Rows.Count)
             {
-                browserGrid.ClearSelection();
-                browserGrid.Rows[e.RowIndex].Selected = true;
+                if (!browserGrid.Rows[e.RowIndex].Selected)
+                {
+                    browserGrid.ClearSelection();
+                    browserGrid.Rows[e.RowIndex].Selected = true;
+                }
                 browserGrid.CurrentCell = browserGrid.Rows[e.RowIndex].Cells[0];
             }
             else
@@ -122,9 +140,11 @@ namespace CloudflareR2Uploader.Forms
 
         private void OnBrowserContextMenuOpening(object sender, CancelEventArgs e)
         {
-            _browserContextItem = GetSelectedBrowserItem();
-            bool hasItem = _browserContextItem != null;
-            bool isFolder = hasItem && _browserContextItem.IsFolder;
+            List<R2BrowserItem> selection = GetSelectedBrowserItems();
+            _browserContextItem = selection.Count == 1 ? selection[0] : null;
+            bool hasItem = selection.Count > 0;
+            bool single = selection.Count == 1;
+            bool isFolder = single && _browserContextItem.IsFolder;
             bool canOperate = _connectionVerified && !_browserLoading &&
                               !_browserOperationInProgress && !_queueService.IsRunning;
             bool clipboardAvailable = _browserClipboard != null &&
@@ -132,29 +152,37 @@ namespace CloudflareR2Uploader.Forms
                 string.Equals(_browserClipboard.ProfileId, _settings.ActiveBucketProfileId, StringComparison.OrdinalIgnoreCase) &&
                 string.Equals(_browserClipboard.BucketName, _settings.BucketName, StringComparison.Ordinal);
 
-            _contextOpenItem.Visible = isFolder;
+            _contextOpenItem.Visible = single && isFolder;
             _contextOpenItem.Enabled = canOperate;
-            _contextDownloadItem.Visible = hasItem && !isFolder;
+            _contextDownloadItem.Visible = hasItem;
+            _contextDownloadItem.Text = selection.Count == 1 && !isFolder ? "Download..." : "Download selected...";
             _contextDownloadItem.Enabled = canOperate;
-            _contextOverwriteItem.Visible = hasItem && !isFolder;
+            _contextOverwriteItem.Visible = single && !isFolder;
             _contextOverwriteItem.Enabled = canOperate;
             _contextObjectActionsSeparator.Visible = hasItem;
-            _contextCopyItem.Visible = hasItem;
+            _contextCopyItem.Visible = single;
             _contextCopyItem.Enabled = canOperate;
             _contextNewFolderItem.Visible = !hasItem;
             _contextNewFolderItem.Enabled = canOperate;
-            _contextRenameItem.Visible = hasItem;
+            _contextRenameItem.Visible = single;
             _contextRenameItem.Enabled = canOperate;
-            _contextMoveItem.Visible = hasItem;
+            _contextMoveItem.Visible = single;
             _contextMoveItem.Enabled = canOperate;
             _contextDeleteItem.Visible = hasItem;
+            _contextDeleteItem.Text = selection.Count > 1 ? "Delete selected..." : "Delete...";
             _contextDeleteItem.Enabled = canOperate;
-            _contextPasteItem.Visible = clipboardAvailable;
-            _contextPasteItem.Enabled = canOperate && clipboardAvailable;
+            _contextPasteItem.Visible = clipboardAvailable && selection.Count <= 1;
+            _contextPasteItem.Enabled = canOperate && clipboardAvailable && selection.Count <= 1;
             _contextPasteItem.Text = isFolder
                 ? "Paste into \"" + _browserContextItem.DisplayName + "\""
                 : "Paste into this folder";
             _contextRefreshItem.Enabled = _connectionVerified && !_browserLoading && !_browserOperationInProgress;
+            int fileCount = selection.Count(value => !value.IsFolder);
+            bool publicConfigured = _settings != null && !string.IsNullOrWhiteSpace(_settings.PublicBaseUrl);
+            _contextCopyKeysItem.Visible = hasItem; _contextCopyKeysItem.Enabled = canOperate;
+            _contextCopyPublicUrlsItem.Visible = fileCount > 0; _contextCopyPublicUrlsItem.Enabled = canOperate && publicConfigured;
+            _contextOpenPublicUrlItem.Visible = single && !isFolder; _contextOpenPublicUrlItem.Enabled = canOperate && publicConfigured;
+            _contextTemporaryUrlItem.Visible = single && !isFolder; _contextTemporaryUrlItem.Enabled = canOperate;
         }
 
         private R2BrowserItem GetSelectedBrowserItem()
@@ -170,6 +198,12 @@ namespace CloudflareR2Uploader.Forms
 
         private async void OnContextDownloadClick(object sender, EventArgs e)
         {
+            List<R2BrowserItem> selection = GetSelectedBrowserItems();
+            if (selection.Count != 1 || (selection.Count == 1 && selection[0].IsFolder))
+            {
+                await DownloadSelectedBrowserItemsAsync();
+                return;
+            }
             R2BrowserItem item = _browserContextItem;
             if (item == null || item.IsFolder) return;
 
@@ -395,6 +429,10 @@ namespace CloudflareR2Uploader.Forms
 
         private async void OnContextDeleteClick(object sender, EventArgs e)
         {
+            await DeleteSelectedBrowserItemsAsync();
+            return;
+            /* Legacy single-object implementation retained below for source compatibility. */
+#pragma warning disable CS0162
             R2BrowserItem item = _browserContextItem;
             if (item == null) return;
 
@@ -418,6 +456,7 @@ namespace CloudflareR2Uploader.Forms
                 async (settings, credentials, progress, token) =>
                     await _objectOperationService.DeleteAsync(
                         settings, credentials, item, progress, token));
+#pragma warning restore CS0162
         }
 
         private async Task RunBrowserOperationAsync(
@@ -551,6 +590,7 @@ namespace CloudflareR2Uploader.Forms
 
         private void RefreshBrowserAfterMutation()
         {
+            InvalidateBrowserDetails();
             _browserContentVersion++;
             _browserNeedsRefresh = true;
             _browserHasLoaded = false;
