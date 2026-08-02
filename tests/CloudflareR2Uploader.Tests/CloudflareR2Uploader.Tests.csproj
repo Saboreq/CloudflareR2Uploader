@@ -49,7 +49,7 @@
       <Version>3.6.4</Version>
     </PackageReference>
     <PackageReference Include="MSTest.TestFramework">
-      <Version>3.6.4</Version>
+      <Version>4.3.3</Version>
     </PackageReference>
   </ItemGroup>
   <ItemGroup>
