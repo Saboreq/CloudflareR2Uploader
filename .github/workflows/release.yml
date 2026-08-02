@@ -1,0 +1,65 @@
+name: Tagged release
+
+on:
+  push:
+    tags:
+      - v*.*.*
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: windows-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: microsoft/setup-msbuild@v2
+      - uses: NuGet/setup-nuget@v2
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+      - name: Validate tag and derive version
+        id: version
+        shell: pwsh
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          if ($env:RELEASE_TAG -notmatch '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$') {
+            throw "Unsupported release tag: $env:RELEASE_TAG"
+          }
+          "version=$($Matches.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+          "prerelease=$($Matches.version.Contains('-').ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
+      - name: Restore, build, test, and package
+        shell: pwsh
+        env:
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          UPDATE_BASE_URL: ${{ vars.UPDATE_BASE_URL }}
+          UPDATE_PREFIX: ${{ vars.UPDATE_PREFIX }}
+        run: |
+          $parameters = @{ Version = $env:RELEASE_VERSION }
+          if ($env:UPDATE_BASE_URL) { $parameters.UpdateBaseUrl = $env:UPDATE_BASE_URL }
+          if ($env:UPDATE_PREFIX) { $parameters.UpdatePrefix = $env:UPDATE_PREFIX }
+          & .\build\Build-Release.ps1 @parameters
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.ref_name }}
+          RELEASE_VERSION: ${{ steps.version.outputs.version }}
+          IS_PRERELEASE: ${{ steps.version.outputs.prerelease }}
+        run: |
+          gh release view $env:RELEASE_TAG *> $null
+          if ($LASTEXITCODE -eq 0) { throw "Release $env:RELEASE_TAG already exists." }
+          $installer = "dist/CloudflareR2Uploader-v$env:RELEASE_VERSION-Setup.exe"
+          if (-not (Test-Path -LiteralPath $installer)) { throw 'Release installer is missing.' }
+          $arguments = @('release','create',$env:RELEASE_TAG,$installer,'--title',"Cloudflare R2 Uploader $env:RELEASE_VERSION",'--generate-notes','--verify-tag')
+          if ($env:IS_PRERELEASE -eq 'true') { $arguments += '--prerelease' }
+          & gh @arguments
+          if ($LASTEXITCODE -ne 0) { throw "gh release create failed with exit code $LASTEXITCODE" }
