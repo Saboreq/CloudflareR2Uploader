@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Contains files the legacy WinForms project compiles as links; see build\Modern.props. -->
+    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
+  </PropertyGroup>
+
+  <Import Project="..\..\build\Modern.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CloudflareR2Uploader</RootNamespace>
+    <AssemblyName>CloudflareR2Uploader.Infrastructure.R2</AssemblyName>
+    <Description>Cloudflare R2 S3-compatible API access: listing, uploading, multipart resume, downloads, object operations, metadata, presigned URLs and previews.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- Pinned to the exact versions the WinForms build ships, so request shapes and
+         multipart behaviour are identical across both front ends. -->
+    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
+    <PackageReference Include="MetadataExtractor" Version="2.9.3" />
+    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudflareR2Uploader.Core\CloudflareR2Uploader.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CloudflareR2Uploader.Infrastructure.Tests" />
+    <InternalsVisibleTo Include="CloudflareR2Uploader.Platform.Windows" />
+    <InternalsVisibleTo Include="CloudflareR2Uploader.Wpf" />
+    <InternalsVisibleTo Include="CloudflareR2Uploader.Wpf.Tests" />
+  </ItemGroup>
+
+</Project>

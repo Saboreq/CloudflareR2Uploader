@@ -31,9 +31,11 @@ DefaultGroupName=Cloudflare R2 Uploader
 DisableProgramGroupPage=yes
 PrivilegesRequired=lowest
 MinVersion=10.0
+ArchitecturesAllowed=x64compatible
+ArchitecturesInstallIn64BitMode=x64compatible
 OutputDir={#OutputDir}
 OutputBaseFilename={#OutputBaseFilename}
-SetupIconFile={#RepositoryRoot}\src\CloudflareR2Uploader\Resources\app.ico
+SetupIconFile={#RepositoryRoot}\src\CloudflareR2Uploader.Wpf\Resources\app.ico
 UninstallDisplayIcon={app}\CloudflareR2Uploader.exe
 UninstallDisplayName=Cloudflare R2 Uploader
 Uninstallable=yes
@@ -71,6 +73,58 @@ Name: "{userdesktop}\Cloudflare R2 Uploader"; Filename: "{app}\CloudflareR2Uploa
 Filename: "{app}\CloudflareR2Uploader.exe"; Parameters: "--show"; Description: "Open Cloudflare R2 Uploader"; Flags: nowait postinstall skipifsilent
 
 [Code]
+function IsDotNetDesktopRuntimeInstalled: Boolean;
+var
+  Versions: TArrayOfString;
+  Index: Integer;
+begin
+  Result := False;
+  { The .NET installer stores this registration in the 32-bit registry view;
+    the x64 segment identifies the runtime architecture. Keep the 64-bit-view
+    fallback for machines whose registration was created by another installer. }
+  if not RegGetValueNames(
+    HKLM32,
+    'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App',
+    Versions) then
+    if not RegGetValueNames(
+      HKLM64,
+      'SOFTWARE\dotnet\Setup\InstalledVersions\x64\sharedfx\Microsoft.WindowsDesktop.App',
+      Versions) then
+      Exit;
+
+  for Index := 0 to GetArrayLength(Versions) - 1 do
+    if Pos('10.', Versions[Index]) = 1 then
+    begin
+      Result := True;
+      Exit;
+    end;
+end;
+
+function InitializeSetup: Boolean;
+var
+  ErrorCode: Integer;
+begin
+  Result := IsDotNetDesktopRuntimeInstalled;
+  if Result then
+    Exit;
+
+  MsgBox(
+    'Cloudflare R2 Uploader requires the Microsoft .NET 10 Desktop Runtime (x64). ' +
+    'Install it, then run this setup again.',
+    mbError,
+    MB_OK);
+
+  if not WizardSilent then
+    ShellExec(
+      'open',
+      'https://dotnet.microsoft.com/download/dotnet/10.0',
+      '',
+      '',
+      SW_SHOWNORMAL,
+      ewNoWait,
+      ErrorCode);
+end;
+
 function IsUpdateInstall: Boolean;
 begin
   Result := CompareText(ExpandConstant('{param:UPDATE|0}'), '1') = 0;

@@ -1,0 +1,95 @@
+<dialogs:ThemedDialogWindow x:Class="CloudflareR2Uploader.Wpf.Views.Dialogs.TextPromptDialog"
+                           xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                           xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                           xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+                           xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+                           xmlns:controls="clr-namespace:CloudflareR2Uploader.Wpf.Controls"
+                           xmlns:dialogs="clr-namespace:CloudflareR2Uploader.Wpf.Views.Dialogs"
+                           xmlns:vm="clr-namespace:CloudflareR2Uploader.Wpf.ViewModels.Dialogs"
+                           mc:Ignorable="d"
+                           d:DataContext="{d:DesignInstance Type=vm:TextPromptViewModel}"
+                           Title="{Binding Title}"
+                           Width="480"
+                           SizeToContent="Height"
+                           Style="{StaticResource Dialog.Window}">
+
+    <Grid>
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Grid.Row="0" Style="{StaticResource Dialog.Header}">
+            <Grid>
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <TextBlock Grid.Column="0" Style="{StaticResource Dialog.Title}" Text="{Binding Title}" />
+                <Button Grid.Column="1"
+                        controls:Icon.Data="{StaticResource Icon.Close}"
+                        AutomationProperties.Name="Close"
+                        Command="{Binding CancelCommand}"
+                        IsCancel="True"
+                        Style="{StaticResource Button.IconBorderless}"
+                        ToolTip="Close (Escape)" />
+            </Grid>
+        </Border>
+
+        <Border Grid.Row="1" Style="{StaticResource Dialog.Body}">
+            <StackPanel>
+                <TextBlock Margin="0,0,0,7"
+                           Style="{StaticResource Text.Value}"
+                           Text="{Binding Label}"
+                           TextTrimming="None" />
+
+                <TextBox x:Name="ValueBox"
+                         controls:Placeholder.Text="{Binding Placeholder}"
+                         AutomationProperties.Name="{Binding Label}"
+                         Text="{Binding Value, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}">
+                    <TextBox.Style>
+                        <Style TargetType="TextBox" BasedOn="{StaticResource TextBox.Default}">
+                            <Style.Triggers>
+                                <DataTrigger Binding="{Binding UseMonospace}" Value="True">
+                                    <Setter Property="FontFamily" Value="{StaticResource Fonts.Mono}" />
+                                    <Setter Property="FontSize" Value="{StaticResource Font.Size.Mono}" />
+                                </DataTrigger>
+                                <DataTrigger Binding="{Binding HasError}" Value="True">
+                                    <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}" />
+                                </DataTrigger>
+                            </Style.Triggers>
+                        </Style>
+                    </TextBox.Style>
+                </TextBox>
+
+                <TextBlock Style="{StaticResource Text.FieldError}"
+                           Text="{Binding Error}"
+                           Visibility="{Binding HasError, Converter={StaticResource BoolToVisible}}" />
+
+                <TextBlock Margin="0,10,0,0"
+                           Style="{StaticResource Text.Hint}"
+                           Text="{Binding Hint}"
+                           Visibility="{Binding HasHint, Converter={StaticResource BoolToVisible}}" />
+            </StackPanel>
+        </Border>
+
+        <Border Grid.Row="2" Style="{StaticResource Dialog.Footer}">
+            <StackPanel HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button Height="{StaticResource Size.DialogControlHeight}"
+                        MinWidth="88"
+                        Margin="0,0,8,0"
+                        Command="{Binding CancelCommand}"
+                        Content="Cancel"
+                        IsCancel="True"
+                        Style="{StaticResource Button.Ghost}" />
+                <Button Height="{StaticResource Size.DialogControlHeight}"
+                        MinWidth="88"
+                        Command="{Binding ConfirmCommand}"
+                        Content="{Binding ConfirmLabel}"
+                        IsDefault="True"
+                        Style="{StaticResource Button.Primary}" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</dialogs:ThemedDialogWindow>

@@ -1,0 +1,107 @@
+<!--
+    Status badges, matching the BADGES row of Images/09-design-system-components.png.
+
+    Every badge carries its own word, never colour alone, so a colour-blind or monochrome
+    user reads exactly the same status. Badges are non-interactive and are excluded from the
+    tab order; their text is exposed to automation through the containing row's name.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="Badge.Base" TargetType="Border">
+        <Setter Property="CornerRadius" Value="3" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="Padding" Value="7,1,7,2" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="Badge.Text" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{StaticResource Fonts.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Font.Size.Caption}" />
+        <Setter Property="FontWeight" Value="Medium" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+
+    <Style x:Key="Badge.Neutral" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+    </Style>
+
+    <Style x:Key="Badge.Queued" TargetType="Border" BasedOn="{StaticResource Badge.Neutral}" />
+
+    <Style x:Key="Badge.Uploading" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.AccentWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentBorder}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+
+    <Style x:Key="Badge.Completed" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.SuccessWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Success}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Success}" />
+    </Style>
+
+    <Style x:Key="Badge.Paused" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.WarningWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Warning}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Warning}" />
+    </Style>
+
+    <Style x:Key="Badge.Failed" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.DangerWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+
+    <!-- File-type badge next to the inspector title, e.g. PNG. -->
+    <Style x:Key="Badge.Kind" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.AccentWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.AccentBorder}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Accent}" />
+    </Style>
+
+    <Style x:Key="Badge.KindText" TargetType="TextBlock" BasedOn="{StaticResource Badge.Text}">
+        <Setter Property="FontFamily" Value="{StaticResource Fonts.Mono}" />
+        <Setter Property="FontSize" Value="10" />
+        <Setter Property="FontWeight" Value="Bold" />
+    </Style>
+
+    <!-- Count badge on the Activity tab and the Errors chip. -->
+    <Style x:Key="Badge.Count" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Badge}" />
+        <Setter Property="Padding" Value="7,0,7,1" />
+        <Setter Property="MinWidth" Value="20" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.TextSecondary}" />
+    </Style>
+
+    <Style x:Key="Badge.CountDanger" TargetType="Border" BasedOn="{StaticResource Badge.Count}">
+        <Setter Property="Background" Value="{DynamicResource Brush.DangerWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Danger}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+
+    <!--
+        Visibility badge in the inspector's OBJECT group: a dot plus the word, so the
+        meaning survives without colour.
+    -->
+    <Style x:Key="Badge.Public" TargetType="Border" BasedOn="{StaticResource Badge.Base}">
+        <Setter Property="Background" Value="{DynamicResource Brush.SuccessWash}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Success}" />
+        <Setter Property="TextElement.Foreground" Value="{DynamicResource Brush.Success}" />
+    </Style>
+
+    <Style x:Key="Badge.Private" TargetType="Border" BasedOn="{StaticResource Badge.Neutral}" />
+
+    <!-- Connection dot in the header. Paired with the word Connected / Disconnected. -->
+    <Style x:Key="Dot.Status" TargetType="Ellipse">
+        <Setter Property="Width" Value="6" />
+        <Setter Property="Height" Value="6" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+        <Setter Property="Margin" Value="0,0,6,0" />
+    </Style>
+
+</ResourceDictionary>

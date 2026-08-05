@@ -1,0 +1,54 @@
+<!--
+    The one focus visual used by every control in the application.
+
+    A 1 px accent ring offset 1 px outside the control, exactly as shown in the FOCUSED
+    column of Images/08-design-system-overview.png. It is never removed for aesthetic
+    reasons: keyboard focus must stay visible, and it is deliberately distinct from the
+    selected state, which uses a wash plus an accent edge instead of a ring.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="FocusVisual.Ring">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-2"
+                            BorderBrush="{DynamicResource Brush.Accent}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Control}"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- For pill-shaped controls (chips, badges, toggles). -->
+    <Style x:Key="FocusVisual.Pill">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border Margin="-2"
+                            BorderBrush="{DynamicResource Brush.Accent}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.PillFocus}"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- For elements that fill their slot, such as table rows and menu items. -->
+    <Style x:Key="FocusVisual.Inset">
+        <Setter Property="Control.Template">
+            <Setter.Value>
+                <ControlTemplate>
+                    <Border BorderBrush="{DynamicResource Brush.Accent}"
+                            BorderThickness="1"
+                            SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

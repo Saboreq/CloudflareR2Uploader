@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Links test files the legacy WinForms suite also compiles; see build/Modern.props. -->
+    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
+  </PropertyGroup>
+
+  <Import Project="..\..\build\ModernTests.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CloudflareR2Uploader.Infrastructure.Tests</AssemblyName>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CloudflareR2Uploader.Infrastructure.R2\CloudflareR2Uploader.Infrastructure.R2.csproj" />
+  </ItemGroup>
+
+  <!-- Migrated from the WinForms suite; see the comment in CloudflareR2Uploader.Core.Tests. -->
+  <ItemGroup>
+    <Compile Include="..\CloudflareR2Uploader.Tests\TestSupport.cs" Link="Migrated\TestSupport.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\BulkOperationServiceTests.cs" Link="Migrated\BulkOperationServiceTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\PreviewServiceTests.cs" Link="Migrated\PreviewServiceTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\R2BrowserResponseMapperTests.cs" Link="Migrated\R2BrowserResponseMapperTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\RetryServiceTests.cs" Link="Migrated\RetryServiceTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\SdkContractTests.cs" Link="Migrated\SdkContractTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\TransientErrorClassifierTests.cs" Link="Migrated\TransientErrorClassifierTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\UploadQueueServiceTests.cs" Link="Migrated\UploadQueueServiceTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\UrlServiceTests.cs" Link="Migrated\UrlServiceTests.cs" />
+  </ItemGroup>
+
+</Project>

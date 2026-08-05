@@ -1,0 +1,61 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\build\Modern.props" />
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <UseWindowsForms>true</UseWindowsForms>
+    <RootNamespace>CloudflareR2Uploader.Wpf</RootNamespace>
+
+    <!-- The installer, the Run-key registration, the single-instance names and the
+         updater all expect CloudflareR2Uploader.exe. -->
+    <AssemblyName>CloudflareR2Uploader</AssemblyName>
+    <!-- Give developer builds a distinct executable identity so Windows app activation
+         cannot route a visual smoke test to the installed production executable. -->
+    <AssemblyName Condition="'$(Configuration)' == 'Debug'">CloudflareR2Uploader.Wpf.Debug</AssemblyName>
+    <Description>Uploads files of any size to a Cloudflare R2 bucket over the S3-compatible API.</Description>
+
+    <!-- The whole project is new code, so nullable is on for real here. -->
+    <Nullable>enable</Nullable>
+
+    <ApplicationIcon>Resources\app.ico</ApplicationIcon>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <PlatformTarget>AnyCPU</PlatformTarget>
+    <SelfContained>false</SelfContained>
+    <PublishSingleFile>false</PublishSingleFile>
+    <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
+    <EnableWindowsTargeting>true</EnableWindowsTargeting>
+    <!-- This is a WPF application. WinForms is referenced only for NotifyIcon, so its
+         manifest-specific DPI warning does not apply to our WPF startup path. -->
+    <NoWarn>$(NoWarn);WFO0003</NoWarn>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="CommunityToolkit.Mvvm" Version="8.4.0" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
+    <PackageReference Include="Microsoft.Web.WebView2" Version="1.0.4078.44" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\CloudflareR2Uploader.Core\CloudflareR2Uploader.Core.csproj" />
+    <ProjectReference Include="..\CloudflareR2Uploader.Infrastructure.R2\CloudflareR2Uploader.Infrastructure.R2.csproj" />
+    <ProjectReference Include="..\CloudflareR2Uploader.Platform.Windows\CloudflareR2Uploader.Platform.Windows.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="Resources\app.ico" />
+    <Resource Include="Resources\Fonts\*.ttf" />
+    <Content Include="Resources\Fonts\Inter-LICENSE.txt">
+      <Link>licenses\Inter-LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CloudflareR2Uploader.Wpf.Tests" />
+  </ItemGroup>
+
+</Project>

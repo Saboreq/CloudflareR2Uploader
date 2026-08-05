@@ -1,0 +1,182 @@
+<!--
+    Context menu, matching the CONTEXT MENU block of Images/09-design-system-components.png.
+
+    Elevated surface, strong border, deep shadow and no blur. The first item is highlighted
+    with the filled accent, shortcuts sit right-aligned in the mono face, and Delete uses the
+    danger colour and lives near the bottom above Refresh.
+
+    This is a real WPF ContextMenu, so Shift+F10 and the Menu key open it, arrow keys move
+    through it, Escape closes it and focus returns to the row it was opened from.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:controls="clr-namespace:CloudflareR2Uploader.Wpf.Controls">
+
+    <Style x:Key="ContextMenu.Default" TargetType="ContextMenu">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="MinWidth" Value="240" />
+        <Setter Property="Padding" Value="4" />
+        <Setter Property="HasDropShadow" Value="True" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ContextMenu">
+                    <Border x:Name="Root"
+                            Background="{DynamicResource Brush.Elevated}"
+                            BorderBrush="{DynamicResource Brush.BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Menu}"
+                            Padding="{TemplateBinding Padding}"
+                            SnapsToDevicePixels="True">
+                        <Border.Effect>
+                            <!-- One shadow on the menu itself, not per item. -->
+                            <DropShadowEffect BlurRadius="18"
+                                              Direction="270"
+                                              Opacity="0.55"
+                                              ShadowDepth="4"
+                                              Color="#000000" />
+                        </Border.Effect>
+                        <StackPanel ClipToBounds="True"
+                                    IsItemsHost="True"
+                                    KeyboardNavigation.DirectionalNavigation="Cycle" />
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <ControlTemplate x:Key="MenuItem.Template" TargetType="MenuItem">
+        <Border x:Name="Root"
+                Background="Transparent"
+                CornerRadius="{StaticResource Radius.MenuItem}"
+                SnapsToDevicePixels="True">
+            <Grid Height="28" Margin="8,0,10,0">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="22" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <Path x:Name="Glyph"
+                      Grid.Column="0"
+                      Width="13"
+                      Height="13"
+                      HorizontalAlignment="Left"
+                      VerticalAlignment="Center"
+                      Data="{Binding Path=(controls:Icon.Data), RelativeSource={RelativeSource TemplatedParent}}"
+                      Stretch="Uniform"
+                      Stroke="{TemplateBinding Foreground}"
+                      StrokeThickness="1.5"
+                      StrokeStartLineCap="Round"
+                      StrokeEndLineCap="Round"
+                      StrokeLineJoin="Round" />
+
+                <ContentPresenter x:Name="Label"
+                                  Grid.Column="1"
+                                  VerticalAlignment="Center"
+                                  ContentSource="Header"
+                                  RecognizesAccessKey="True"
+                                  TextElement.Foreground="{TemplateBinding Foreground}" />
+
+                <TextBlock x:Name="Shortcut"
+                           Grid.Column="2"
+                           Margin="24,0,0,0"
+                           VerticalAlignment="Center"
+                           FontFamily="{StaticResource Fonts.Mono}"
+                           FontSize="10.5"
+                           Foreground="{DynamicResource Brush.TextMuted}"
+                           Text="{TemplateBinding InputGestureText}" />
+            </Grid>
+        </Border>
+        <ControlTemplate.Triggers>
+            <Trigger Property="IsHighlighted" Value="True">
+                <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.Accent}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextOnAccent}" />
+                <Setter TargetName="Shortcut" Property="Foreground" Value="{DynamicResource Brush.TextOnAccent}" />
+            </Trigger>
+            <Trigger Property="IsEnabled" Value="False">
+                <Setter TargetName="Root" Property="Opacity" Value="0.4" />
+            </Trigger>
+        </ControlTemplate.Triggers>
+    </ControlTemplate>
+
+    <Style x:Key="MenuItem.Default" TargetType="MenuItem">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="FontFamily" Value="{StaticResource Fonts.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Font.Size.Body}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        <Setter Property="Template" Value="{StaticResource MenuItem.Template}" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <!-- Destructive actions. Kept near the bottom of the menu, above Refresh. -->
+    <Style x:Key="MenuItem.Danger" TargetType="MenuItem" BasedOn="{StaticResource MenuItem.Default}">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="MenuItem">
+                    <Border x:Name="Root"
+                            Background="Transparent"
+                            CornerRadius="{StaticResource Radius.MenuItem}"
+                            SnapsToDevicePixels="True">
+                        <Grid Height="28" Margin="8,0,10,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="22" />
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <Path Grid.Column="0"
+                                  Width="13"
+                                  Height="13"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Center"
+                                  Data="{Binding Path=(controls:Icon.Data), RelativeSource={RelativeSource TemplatedParent}}"
+                                  Stretch="Uniform"
+                                  Stroke="{TemplateBinding Foreground}"
+                                  StrokeThickness="1.5"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round"
+                                  StrokeLineJoin="Round" />
+                            <ContentPresenter Grid.Column="1"
+                                              VerticalAlignment="Center"
+                                              ContentSource="Header"
+                                              RecognizesAccessKey="True"
+                                              TextElement.Foreground="{TemplateBinding Foreground}" />
+                            <TextBlock Grid.Column="2"
+                                       Margin="24,0,0,0"
+                                       VerticalAlignment="Center"
+                                       FontFamily="{StaticResource Fonts.Mono}"
+                                       FontSize="10.5"
+                                       Foreground="{DynamicResource Brush.Danger}"
+                                       Opacity="0.8"
+                                       Text="{TemplateBinding InputGestureText}" />
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsHighlighted" Value="True">
+                            <Setter TargetName="Root" Property="Background" Value="{DynamicResource Brush.DangerWash}" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Root" Property="Opacity" Value="0.4" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <Style x:Key="Separator.Menu" TargetType="Separator">
+        <Setter Property="Height" Value="1" />
+        <Setter Property="Margin" Value="6,4,6,4" />
+        <Setter Property="Background" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Separator">
+                    <Rectangle Height="1" Fill="{DynamicResource Brush.Border}" SnapsToDevicePixels="True" />
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

@@ -1,0 +1,102 @@
+<!--
+    Progress bars, matching the PROGRESS row of Images/09-design-system-components.png:
+    a 4 px bar inside a queue row and a 6 px overall bar, each in four colours.
+
+    Screen readers get a real value: every bar sets AutomationProperties.Name at the call
+    site to a sentence such as "Uploading app-1.7.5-win-x64.zip, 57 percent", because a bare
+    percentage read out of context is not useful.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ControlTemplate x:Key="ProgressBar.Template" TargetType="ProgressBar">
+        <Grid x:Name="Root" SnapsToDevicePixels="True">
+            <Border Background="{TemplateBinding Background}"
+                    CornerRadius="{StaticResource Radius.Bar}"
+                    SnapsToDevicePixels="True" />
+            <Border x:Name="PART_Track" Background="Transparent" />
+            <Border x:Name="PART_Indicator"
+                    HorizontalAlignment="Left"
+                    Background="{TemplateBinding Foreground}"
+                    CornerRadius="{StaticResource Radius.Bar}"
+                    SnapsToDevicePixels="True" />
+        </Grid>
+    </ControlTemplate>
+
+    <Style x:Key="ProgressBar.Base" TargetType="ProgressBar">
+        <Setter Property="Template" Value="{StaticResource ProgressBar.Template}" />
+        <Setter Property="Background" Value="{DynamicResource Brush.ProgressTrack}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Minimum" Value="0" />
+        <Setter Property="Maximum" Value="100" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+        <Setter Property="UseLayoutRounding" Value="True" />
+    </Style>
+
+    <!-- 4 px bar inside an upload queue row. -->
+    <Style x:Key="ProgressBar.Row" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBar.Base}">
+        <Setter Property="Height" Value="{StaticResource Size.ProgressRowHeight}" />
+    </Style>
+
+    <!-- 6 px bar in the overall progress block. -->
+    <Style x:Key="ProgressBar.Overall" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBar.Base}">
+        <Setter Property="Height" Value="{StaticResource Size.ProgressOverallHeight}" />
+    </Style>
+
+    <Style x:Key="ProgressBar.RowComplete" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBar.Row}">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Success}" />
+    </Style>
+
+    <Style x:Key="ProgressBar.RowPaused" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBar.Row}">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Warning}" />
+    </Style>
+
+    <Style x:Key="ProgressBar.RowFailed" TargetType="ProgressBar" BasedOn="{StaticResource ProgressBar.Row}">
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Danger}" />
+    </Style>
+
+    <!--
+        Indeterminate spinner for the preview's loading state. A rotating arc rather than a
+        marquee bar, matching the LOADING placeholder in the reference.
+    -->
+    <Style x:Key="Spinner" TargetType="Control">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="Focusable" Value="False" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Accent}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Control">
+                    <Grid RenderTransformOrigin="0.5,0.5">
+                        <Grid.RenderTransform>
+                            <RotateTransform x:Name="Rotation" />
+                        </Grid.RenderTransform>
+                        <Ellipse Stroke="{DynamicResource Brush.Border}" StrokeThickness="2" />
+                        <Path Data="M 11 1 A 10 10 0 0 1 21 11"
+                              Stroke="{TemplateBinding Foreground}"
+                              StrokeThickness="2"
+                              StrokeStartLineCap="Round"
+                              StrokeEndLineCap="Round" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="Rotation"
+                                                     Storyboard.TargetProperty="Angle"
+                                                     From="0"
+                                                     To="360"
+                                                     Duration="0:0:0.9"
+                                                     RepeatBehavior="Forever" />
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

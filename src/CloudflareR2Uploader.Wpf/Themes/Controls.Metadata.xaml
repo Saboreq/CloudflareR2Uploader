@@ -1,0 +1,73 @@
+<!--
+    Grouped metadata rows, matching the METADATA SECTIONS block of
+    Images/10-design-system-composites.png: a 96 px label lane, the value beside it, and an
+    optional copy button pinned to the right.
+
+    The label lane is a fixed width rather than a SharedSizeGroup so that groups in different
+    scroll regions still line up with each other, which is what the reference shows.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="MetadataGroup" TargetType="Border">
+        <Setter Property="Margin" Value="0,0,0,14" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="MetadataGroup.Header" TargetType="TextBlock" BasedOn="{StaticResource Text.GroupHeader}">
+        <Setter Property="Margin" Value="0,0,0,8" />
+    </Style>
+
+    <Style x:Key="MetadataRow.Label" TargetType="TextBlock" BasedOn="{StaticResource Text.Value}">
+        <Setter Property="Width" Value="{StaticResource Size.MetadataLabelWidth}" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextMuted}" />
+        <Setter Property="Margin" Value="0,2,8,0" />
+    </Style>
+
+    <Style x:Key="MetadataRow.Value" TargetType="TextBlock" BasedOn="{StaticResource Text.Body}">
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextTrimming" Value="None" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+    </Style>
+
+    <!-- Keys, ETags and URLs are copied by the user, so they use the mono face. -->
+    <Style x:Key="MetadataRow.MonoValue" TargetType="TextBlock" BasedOn="{StaticResource Text.Mono}">
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="TextWrapping" Value="Wrap" />
+        <Setter Property="TextTrimming" Value="None" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+    </Style>
+
+    <Style x:Key="MetadataRow.Container" TargetType="Grid">
+        <Setter Property="Margin" Value="0,0,0,7" />
+    </Style>
+
+    <Style x:Key="CopyValueButton" TargetType="Button" BasedOn="{StaticResource Button.Icon}">
+        <Setter Property="Width" Value="22" />
+        <Setter Property="Height" Value="22" />
+        <Setter Property="VerticalAlignment" Value="Top" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+    </Style>
+
+    <!-- Stat tile used by the multiple-selection inspector (TOTAL SIZE / OBJECTS). -->
+    <Style x:Key="StatTile" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource Brush.Surface2}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="{StaticResource Radius.Control}" />
+        <Setter Property="Padding" Value="14,10,14,12" />
+        <Setter Property="SnapsToDevicePixels" Value="True" />
+    </Style>
+
+    <Style x:Key="StatTile.Label" TargetType="TextBlock" BasedOn="{StaticResource Text.GroupHeader}">
+        <Setter Property="Margin" Value="0,0,0,6" />
+    </Style>
+
+    <Style x:Key="StatTile.Value" TargetType="TextBlock" BasedOn="{StaticResource Text.SectionTitle}">
+        <Setter Property="FontSize" Value="19" />
+    </Style>
+
+</ResourceDictionary>

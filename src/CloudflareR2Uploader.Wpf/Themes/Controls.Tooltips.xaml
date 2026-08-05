@@ -1,0 +1,42 @@
+<!--
+    Tooltips.
+
+    Every icon-only control in the application carries one, and each also sets
+    AutomationProperties.Name so the meaning is available to a screen reader that never
+    hovers. Tooltips open quickly and stay long enough to read a shortcut.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <Style x:Key="ToolTip.Default" TargetType="ToolTip">
+        <Setter Property="OverridesDefaultStyle" Value="True" />
+        <Setter Property="HasDropShadow" Value="True" />
+        <Setter Property="Placement" Value="Bottom" />
+        <Setter Property="VerticalOffset" Value="4" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+        <Setter Property="FontFamily" Value="{StaticResource Fonts.Ui}" />
+        <Setter Property="FontSize" Value="{StaticResource Font.Size.Value}" />
+        <Setter Property="MaxWidth" Value="320" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="ToolTip">
+                    <Border Background="{DynamicResource Brush.Elevated}"
+                            BorderBrush="{DynamicResource Brush.BorderStrong}"
+                            BorderThickness="1"
+                            CornerRadius="{StaticResource Radius.Control}"
+                            Padding="9,6,9,7"
+                            SnapsToDevicePixels="True">
+                        <ContentPresenter TextElement.Foreground="{TemplateBinding Foreground}">
+                            <ContentPresenter.Resources>
+                                <Style TargetType="TextBlock">
+                                    <Setter Property="TextWrapping" Value="Wrap" />
+                                </Style>
+                            </ContentPresenter.Resources>
+                        </ContentPresenter>
+                    </Border>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+</ResourceDictionary>

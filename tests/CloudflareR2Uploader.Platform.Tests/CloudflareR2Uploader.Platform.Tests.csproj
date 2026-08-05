@@ -1,0 +1,28 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- Links test files the legacy WinForms suite also compiles; see build/Modern.props. -->
+    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
+  </PropertyGroup>
+
+  <Import Project="..\..\build\ModernTests.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <AssemblyName>CloudflareR2Uploader.Platform.Tests</AssemblyName>
+    <UseWindowsForms>true</UseWindowsForms>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CloudflareR2Uploader.Platform.Windows\CloudflareR2Uploader.Platform.Windows.csproj" />
+  </ItemGroup>
+
+  <!-- Migrated from the WinForms suite; see the comment in CloudflareR2Uploader.Core.Tests. -->
+  <ItemGroup>
+    <Compile Include="..\CloudflareR2Uploader.Tests\TestSupport.cs" Link="Migrated\TestSupport.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\CredentialProtectionTests.cs" Link="Migrated\CredentialProtectionTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\StartupAndSingleInstanceTests.cs" Link="Migrated\StartupAndSingleInstanceTests.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Tests\UpdateServiceTests.cs" Link="Migrated\UpdateServiceTests.cs" />
+  </ItemGroup>
+
+</Project>

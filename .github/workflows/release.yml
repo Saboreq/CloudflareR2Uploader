@@ -17,11 +17,12 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: microsoft/setup-msbuild@v2
-      - uses: NuGet/setup-nuget@v2
+      - uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.0.x
       - name: Install Inno Setup
         shell: pwsh
         run: choco install innosetup --no-progress -y

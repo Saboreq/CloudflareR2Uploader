@@ -1,0 +1,64 @@
+<!--
+    Spacing, radii and control metrics.
+
+    4 px base step, exactly as the reference states. Radii stay small so nothing reads as a
+    web card: 3 px menu item, 4 px control, 6 px menu, 8 px panel, pill for chips and badges.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime">
+
+    <sys:Double x:Key="Space.4">4</sys:Double>
+    <sys:Double x:Key="Space.8">8</sys:Double>
+    <sys:Double x:Key="Space.12">12</sys:Double>
+    <sys:Double x:Key="Space.16">16</sys:Double>
+    <sys:Double x:Key="Space.20">20</sys:Double>
+    <sys:Double x:Key="Space.24">24</sys:Double>
+    <sys:Double x:Key="Space.32">32</sys:Double>
+
+    <Thickness x:Key="Padding.Control">10,0,10,0</Thickness>
+    <Thickness x:Key="Padding.Page">16</Thickness>
+    <Thickness x:Key="Padding.Panel">16,14,16,14</Thickness>
+    <Thickness x:Key="Padding.Cell">10,0,10,0</Thickness>
+
+    <CornerRadius x:Key="Radius.MenuItem">3</CornerRadius>
+    <CornerRadius x:Key="Radius.Control">4</CornerRadius>
+    <CornerRadius x:Key="Radius.Menu">6</CornerRadius>
+    <CornerRadius x:Key="Radius.Panel">8</CornerRadius>
+
+    <!--
+        Pill radii.
+
+        A WPF Border does NOT behave like CSS border-radius. It clamps each corner to half
+        the width and half the height *independently*, so an oversized value such as 999
+        produces elliptical corners that meet in the middle — a full ellipse, not a stadium.
+        The design calls for stadiums, so each pill radius below is exactly half the height
+        of the control it is used on. Changing a control's height means changing its radius.
+    -->
+    <CornerRadius x:Key="Radius.Pill">13</CornerRadius>          <!-- 26 px filter chips -->
+    <CornerRadius x:Key="Radius.PillFocus">15</CornerRadius>     <!-- chip focus ring, 30 px -->
+    <!-- Count badges are 16-18 px tall depending on the font; 8 stays at or under half. -->
+    <CornerRadius x:Key="Radius.Badge">8</CornerRadius>
+    <CornerRadius x:Key="Radius.ToggleTrack">10</CornerRadius>   <!-- 20 px toggle track -->
+    <CornerRadius x:Key="Radius.ToggleThumb">7</CornerRadius>    <!-- 14 px toggle thumb -->
+    <CornerRadius x:Key="Radius.Bar">2</CornerRadius>            <!-- 4-6 px progress bars -->
+    <CornerRadius x:Key="Radius.ScrollThumb">3</CornerRadius>    <!-- 6 px scrollbar thumb -->
+
+    <!-- 28 px in toolbars, 30-32 px in dialogs, 30 px table rows. -->
+    <sys:Double x:Key="Size.ToolbarControlHeight">28</sys:Double>
+    <sys:Double x:Key="Size.DialogControlHeight">32</sys:Double>
+    <sys:Double x:Key="Size.InputHeight">30</sys:Double>
+    <sys:Double x:Key="Size.RowHeight">30</sys:Double>
+    <sys:Double x:Key="Size.HeaderRowHeight">30</sys:Double>
+    <sys:Double x:Key="Size.IconButton">28</sys:Double>
+
+    <!-- The inspector sits between the 360-390 dip band the design calls for. -->
+    <sys:Double x:Key="Size.InspectorWidth">380</sys:Double>
+
+    <!-- Label lane inside a metadata group, from Images/10-design-system-composites.png. -->
+    <sys:Double x:Key="Size.MetadataLabelWidth">96</sys:Double>
+
+    <sys:Double x:Key="Size.ProgressRowHeight">4</sys:Double>
+    <sys:Double x:Key="Size.ProgressOverallHeight">6</sys:Double>
+
+</ResourceDictionary>

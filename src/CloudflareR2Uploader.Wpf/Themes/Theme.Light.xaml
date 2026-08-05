@@ -1,0 +1,58 @@
+<!--
+    Light palette.
+
+    The Paper references only specify the dark palette, so this is derived from it rather
+    than invented: the surface stack is inverted in the same five steps, the accent hue is
+    kept identical so purple still means "active, selected, primary", and each status colour
+    is darkened just enough to hold at least 4.5:1 against its own wash and against the
+    surface it is drawn on.
+
+    Keys match Theme.Dark.xaml exactly. Anything added there must be added here.
+-->
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:po="http://schemas.microsoft.com/winfx/2006/xaml/presentation/options"
+                    xmlns:sys="clr-namespace:System;assembly=System.Runtime"
+                    mc:Ignorable="po"
+                    xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006">
+
+    <sys:Boolean x:Key="Theme.IsDark">False</sys:Boolean>
+
+    <SolidColorBrush x:Key="Brush.Background"    Color="#F7F7FA" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Surface"       Color="#FFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Surface2"      Color="#F2F3F7" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Elevated"      Color="#FFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.RowHover"      Color="#F0F0F6" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Border"        Color="#DFE1E9" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.BorderStrong"  Color="#C2C5D2" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.TextPrimary"   Color="#14151C" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.TextSecondary" Color="#4E5364" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.TextMuted"     Color="#6E7488" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.TextOnAccent"  Color="#FFFFFF" po:Freeze="True" />
+
+    <!-- Same hue as dark, darkened so white label text stays above 4.5:1. -->
+    <SolidColorBrush x:Key="Brush.Accent"        Color="#6D3FE0" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.AccentHover"   Color="#7C4DEB" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.AccentPressed" Color="#5C31C8" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.AccentWash"    Color="#EFE9FE" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.AccentBorder"  Color="#C3ADF6" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.Success"       Color="#0E7A55" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.SuccessWash"   Color="#E4F7EF" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Warning"       Color="#8A5A05" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.WarningWash"   Color="#FCF2DF" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.Danger"        Color="#C1213E" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.DangerWash"    Color="#FCE8EC" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.ProgressTrack" Color="#E3E5EC" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.InputBackground"         Color="#FFFFFF" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.InputBackgroundDisabled" Color="#F1F2F6" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.ScrollBarThumb"      Color="#C6C9D6" po:Freeze="True" />
+    <SolidColorBrush x:Key="Brush.ScrollBarThumbHover" Color="#A9AEC0" po:Freeze="True" />
+
+    <SolidColorBrush x:Key="Brush.Skeleton" Color="#E9EAF0" po:Freeze="True" />
+
+</ResourceDictionary>

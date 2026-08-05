@@ -166,79 +166,99 @@
     <Compile Include="Forms\CancelChoiceDialog.Designer.cs">
       <DependentUpon>CancelChoiceDialog.cs</DependentUpon>
     </Compile>
-    <Compile Include="Models\AppSettings.cs" />
-    <Compile Include="Models\BrowserModels.cs" />
-    <Compile Include="Models\BulkOperationModels.cs" />
-    <Compile Include="Models\DetailsPreviewModels.cs" />
-    <Compile Include="Models\UpdateModels.cs" />
-    <Compile Include="Models\CompletedPartState.cs" />
-    <Compile Include="Models\MultipartUploadState.cs" />
-    <Compile Include="Models\OverwriteBehavior.cs" />
-    <Compile Include="Models\R2BucketProfile.cs" />
-    <Compile Include="Models\R2BrowserBreadcrumbSegment.cs" />
-    <Compile Include="Models\R2BrowserItem.cs" />
-    <Compile Include="Models\R2BrowserPage.cs" />
-    <Compile Include="Models\R2ObjectOperationProgress.cs" />
-    <Compile Include="Models\R2ObjectOperationResult.cs" />
-    <Compile Include="Models\R2Credentials.cs" />
-    <Compile Include="Models\UploadItemStatus.cs" />
-    <Compile Include="Models\UploadProgressInfo.cs" />
-    <Compile Include="Models\UploadQueueItem.cs" />
-    <Compile Include="Models\UploadResult.cs" />
-    <Compile Include="Models\OverallProgressInfo.cs" />
-    <Compile Include="Models\ConnectionTestResult.cs" />
     <Compile Include="Program.cs" />
     <Compile Include="Properties\AssemblyInfo.cs" />
-    <Compile Include="Services\CredentialProtectionService.cs" />
-    <Compile Include="Services\BrowserViewService.cs" />
-    <Compile Include="Services\BulkLocalPathMapper.cs" />
-    <Compile Include="Services\FriendlyErrorService.cs" />
-    <Compile Include="Services\ILoggingService.cs" />
-    <Compile Include="Services\LoggingService.cs" />
-    <Compile Include="Services\MimeTypeService.cs" />
-    <Compile Include="Services\PauseController.cs" />
-    <Compile Include="Services\R2ClientFactory.cs" />
-    <Compile Include="Services\R2ConnectionTester.cs" />
-    <Compile Include="Services\R2BrowserResponseMapper.cs" />
-    <Compile Include="Services\R2ObjectBrowserService.cs" />
-    <Compile Include="Services\R2ObjectOperationService.cs" />
-    <Compile Include="Services\R2BulkOperationService.cs" />
-    <Compile Include="Services\R2ObjectDetailsService.cs" />
-    <Compile Include="Services\R2PresignedUrlService.cs" />
-    <Compile Include="Services\R2PreviewService.cs" />
-    <Compile Include="Services\R2MultipartUploader.cs" />
-    <Compile Include="Services\R2SinglePartUploader.cs" />
-    <Compile Include="Services\R2UploadService.cs" />
-    <Compile Include="Services\RetryService.cs" />
-    <Compile Include="Services\SettingsService.cs" />
-    <Compile Include="Services\SemanticVersion.cs" />
-    <Compile Include="Services\UpdateService.cs" />
-    <Compile Include="Services\PreviewCacheService.cs" />
-    <Compile Include="Services\SingleInstanceCoordinator.cs" />
-    <Compile Include="Services\StartupRegistrationService.cs" />
-    <Compile Include="Services\UserInteractionServices.cs" />
-    <Compile Include="Services\TransientErrorClassifier.cs" />
-    <Compile Include="Services\UploadQueueService.cs" />
-    <Compile Include="Services\UploadStateStore.cs" />
+    <Compile Include="Services\WinFormsClipboardService.cs" />
     <Compile Include="Theming\Theme.cs" />
     <Compile Include="Theming\ThemeFonts.cs" />
     <Compile Include="Theming\DarkTitleBar.cs" />
     <Compile Include="Theming\DarkScrollBars.cs" />
     <Compile Include="Tray\TrayApplicationContext.cs" />
-    <Compile Include="Utilities\AppPaths.cs" />
-    <Compile Include="Utilities\BoundedFileStream.cs" />
-    <Compile Include="Utilities\DurationFormatter.cs" />
-    <Compile Include="Utilities\FileSizeFormatter.cs" />
     <Compile Include="Utilities\GraphicsExtensions.cs" />
-    <Compile Include="Utilities\MultipartCalculator.cs" />
-    <Compile Include="Utilities\ObjectKeyUtility.cs" />
-    <Compile Include="Utilities\PathUtility.cs" />
-    <Compile Include="Utilities\ProgressThrottle.cs" />
-    <Compile Include="Utilities\R2BrowserPaginationState.cs" />
-    <Compile Include="Utilities\R2BrowserPathUtility.cs" />
-    <Compile Include="Utilities\R2ObjectOperationPathUtility.cs" />
-    <Compile Include="Utilities\SpeedEstimator.cs" />
     <Compile Include="Utilities\UiThreadUtility.cs" />
+  </ItemGroup>
+  <!--
+    Shared source. These files physically live in the modern SDK-style projects
+    (CloudflareR2Uploader.Core / .Infrastructure.R2 / .Platform.Windows) and are compiled
+    here as links so there is exactly one implementation of every service while both the
+    WinForms and the WPF front end exist.
+
+    A net48 project cannot reference a net10.0 project, so linking the source is the only
+    way to avoid a second copy. See docs/WPF_MIGRATION_PLAN.md section 3.1.
+
+    Consequence: every file listed below must stay inside the C# 7.3 subset this project
+    compiles with. These links are removed together with this project once WPF parity is
+    signed off.
+  -->
+  <ItemGroup>
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\AppSettings.cs" Link="Models\AppSettings.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\AppTheme.cs" Link="Models\AppTheme.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\BrowserModels.cs" Link="Models\BrowserModels.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\BulkOperationModels.cs" Link="Models\BulkOperationModels.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\CompletedPartState.cs" Link="Models\CompletedPartState.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\ConnectionTestResult.cs" Link="Models\ConnectionTestResult.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\DetailsPreviewModels.cs" Link="Models\DetailsPreviewModels.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\MultipartUploadState.cs" Link="Models\MultipartUploadState.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\OverallProgressInfo.cs" Link="Models\OverallProgressInfo.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\OverwriteBehavior.cs" Link="Models\OverwriteBehavior.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2BrowserBreadcrumbSegment.cs" Link="Models\R2BrowserBreadcrumbSegment.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2BrowserItem.cs" Link="Models\R2BrowserItem.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2BrowserPage.cs" Link="Models\R2BrowserPage.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2BucketProfile.cs" Link="Models\R2BucketProfile.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2Credentials.cs" Link="Models\R2Credentials.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2ObjectOperationProgress.cs" Link="Models\R2ObjectOperationProgress.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\R2ObjectOperationResult.cs" Link="Models\R2ObjectOperationResult.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\UploadItemStatus.cs" Link="Models\UploadItemStatus.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\UploadProgressInfo.cs" Link="Models\UploadProgressInfo.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\UploadQueueItem.cs" Link="Models\UploadQueueItem.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Models\UploadResult.cs" Link="Models\UploadResult.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\BrowserViewService.cs" Link="Services\BrowserViewService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\BulkLocalPathMapper.cs" Link="Services\BulkLocalPathMapper.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\ILoggingService.cs" Link="Services\ILoggingService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\LoggingService.cs" Link="Services\LoggingService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\MimeTypeService.cs" Link="Services\MimeTypeService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\PauseController.cs" Link="Services\PauseController.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\PreviewCacheService.cs" Link="Services\PreviewCacheService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\SemanticVersion.cs" Link="Services\SemanticVersion.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\SettingsMigrator.cs" Link="Services\SettingsMigrator.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\SettingsService.cs" Link="Services\SettingsService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\UploadStateStore.cs" Link="Services\UploadStateStore.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Services\UserInteractionAbstractions.cs" Link="Services\UserInteractionAbstractions.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\AppPaths.cs" Link="Utilities\AppPaths.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\BoundedFileStream.cs" Link="Utilities\BoundedFileStream.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\DurationFormatter.cs" Link="Utilities\DurationFormatter.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\FileSizeFormatter.cs" Link="Utilities\FileSizeFormatter.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\MultipartCalculator.cs" Link="Utilities\MultipartCalculator.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\ObjectKeyUtility.cs" Link="Utilities\ObjectKeyUtility.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\PathUtility.cs" Link="Utilities\PathUtility.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\ProgressThrottle.cs" Link="Utilities\ProgressThrottle.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\R2BrowserPaginationState.cs" Link="Utilities\R2BrowserPaginationState.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\R2BrowserPathUtility.cs" Link="Utilities\R2BrowserPathUtility.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\R2ObjectOperationPathUtility.cs" Link="Utilities\R2ObjectOperationPathUtility.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Core\Utilities\SpeedEstimator.cs" Link="Utilities\SpeedEstimator.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\FriendlyErrorService.cs" Link="Services\FriendlyErrorService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\ImageDimensionReader.cs" Link="Services\ImageDimensionReader.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2BrowserResponseMapper.cs" Link="Services\R2BrowserResponseMapper.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2BulkOperationService.cs" Link="Services\R2BulkOperationService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2ClientFactory.cs" Link="Services\R2ClientFactory.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2ConnectionTester.cs" Link="Services\R2ConnectionTester.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2MultipartUploader.cs" Link="Services\R2MultipartUploader.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2ObjectBrowserService.cs" Link="Services\R2ObjectBrowserService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2ObjectDetailsService.cs" Link="Services\R2ObjectDetailsService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2ObjectOperationService.cs" Link="Services\R2ObjectOperationService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2PresignedUrlService.cs" Link="Services\R2PresignedUrlService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2PreviewService.cs" Link="Services\R2PreviewService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2SinglePartUploader.cs" Link="Services\R2SinglePartUploader.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\R2UploadService.cs" Link="Services\R2UploadService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\RetryService.cs" Link="Services\RetryService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\TransientErrorClassifier.cs" Link="Services\TransientErrorClassifier.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Infrastructure.R2\Services\UploadQueueService.cs" Link="Services\UploadQueueService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Models\UpdateModels.cs" Link="Models\UpdateModels.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Services\CredentialProtectionService.cs" Link="Services\CredentialProtectionService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Services\SingleInstanceCoordinator.cs" Link="Services\SingleInstanceCoordinator.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Services\StartupRegistrationService.cs" Link="Services\StartupRegistrationService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Services\UpdateService.cs" Link="Services\UpdateService.cs" />
+    <Compile Include="..\CloudflareR2Uploader.Platform.Windows\Services\WindowsProcessLauncher.cs" Link="Services\WindowsProcessLauncher.cs" />
   </ItemGroup>
   <ItemGroup>
     <EmbeddedResource Include="Forms\MainForm.resx">

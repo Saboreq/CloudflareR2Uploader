@@ -1,0 +1,76 @@
+<Project>
+
+  <!--
+    Shared MSBuild settings for the modern .NET 10 projects.
+
+    This is imported explicitly by each SDK-style project rather than being placed in a
+    root Directory.Build.props, because the legacy non-SDK CloudflareR2Uploader.csproj
+    imports Microsoft.Common.props and would therefore pick up a root file as well.
+  -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+
+    <!--
+      Project-level nullable is off because several files in Core, Infrastructure.R2 and
+      Platform.Windows are also compiled by the legacy C# 7.3 WinForms project through
+      linked items and cannot carry nullable annotations yet. Every file that only the
+      modern projects compile opts in with a per-file "#nullable enable". When the
+      WinForms project is removed this becomes <Nullable>enable</Nullable>.
+    -->
+    <Nullable>disable</Nullable>
+
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <NeutralLanguage>en</NeutralLanguage>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Company>Saboreq</Company>
+    <Product>Cloudflare R2 Uploader</Product>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+  <!--
+    Projects that set SharedSourceWithLegacy=true contain files which the legacy C# 7.3
+    WinForms project also compiles through linked items. Those files cannot adopt the
+    modernisation the following analyzers suggest without breaking that build, so the
+    suggestions are suppressed here rather than being individually ignored in source.
+
+    Every rule listed below is a "use the newer API/idiom" suggestion, not a correctness
+    rule. Correctness analyzers stay on. This list is deleted together with the WinForms
+    project. See docs/WPF_MIGRATION_PLAN.md section 3.1.
+
+      CA1068 CancellationToken should be the last parameter
+      CA1507 nameof instead of a string literal
+      CA1510 ArgumentNullException.ThrowIfNull
+      CA1512 ArgumentOutOfRangeException.ThrowIfNegative
+      CA1806 unused TryParse result (deliberate: the out value falls back to a default)
+      CA1822 member can be static
+      CA1825 Array.Empty<T>()
+      CA1835 Memory-based Stream.ReadAsync/WriteAsync overloads
+      CA1840 Environment.CurrentManagedThreadId
+      CA1844 Memory-based CopyToAsync
+      CA1845 string.Concat over a span
+      CA1850 static HashData methods
+      CA1859 concrete types for improved performance
+      CA1861 constant arrays as static readonly
+      CA1847 char overload of string.Contains
+      CA1864 Dictionary.TryAdd
+      CA1865 CA1866 char overloads of StartsWith/EndsWith
+      CA1872 Convert.ToHexStringLower
+      CA2016 forward CancellationToken to ReadAsStreamAsync (no such overload on net48)
+      CA2249 string.Contains instead of IndexOf
+      CA2263 generic Enum overloads
+      SYSLIB0014 WebRequest/WebException types, still needed to classify net48 failures
+  -->
+  <PropertyGroup Condition="'$(SharedSourceWithLegacy)' == 'true'">
+    <NoWarn>$(NoWarn);CA1068;CA1507;CA1510;CA1512;CA1806;CA1822;CA1825;CA1835;CA1840;CA1844;CA1845;CA1847;CA1850;CA1859;CA1861;CA1864;CA1865;CA1866;CA1872;CA2016;CA2249;CA2263;SYSLIB0014</NoWarn>
+  </PropertyGroup>
+
+</Project>

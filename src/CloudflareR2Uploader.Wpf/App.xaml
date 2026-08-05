@@ -1,0 +1,66 @@
+<Application x:Class="CloudflareR2Uploader.Wpf.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:converters="clr-namespace:CloudflareR2Uploader.Wpf.Converters"
+             ShutdownMode="OnExplicitShutdown">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <!--
+                    Index 0 is the active palette and is the dictionary ThemeService swaps at
+                    runtime. Nothing else may be inserted before it.
+                -->
+                <ResourceDictionary Source="Themes/Theme.Dark.xaml" />
+
+                <ResourceDictionary Source="Themes/Typography.xaml" />
+                <ResourceDictionary Source="Themes/Spacing.xaml" />
+                <ResourceDictionary Source="Themes/Icons.xaml" />
+
+                <ResourceDictionary Source="Themes/Controls.Focus.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Buttons.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Inputs.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Toggles.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Navigation.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Badges.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Progress.xaml" />
+                <ResourceDictionary Source="Themes/Controls.ScrollBars.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Tables.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Menus.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Dialogs.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Tooltips.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Placeholders.xaml" />
+                <ResourceDictionary Source="Themes/Controls.Metadata.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!-- Shared converter instances. Stateless, so one each is enough. -->
+            <converters:BooleanToVisibilityConverter x:Key="BoolToVisible" />
+            <converters:BooleanToVisibilityConverter x:Key="BoolToCollapsed" Invert="True" />
+            <converters:NullToVisibilityConverter x:Key="NullToCollapsed" />
+            <converters:StringEmptyToVisibilityConverter x:Key="EmptyStringToCollapsed" />
+            <converters:CountToVisibilityConverter x:Key="ZeroCountToCollapsed" />
+            <converters:CountToVisibilityConverter x:Key="ZeroCountToVisible" Invert="True" />
+            <converters:EnumMatchVisibilityConverter x:Key="EnumMatchVisibility" />
+            <converters:FileSizeConverter x:Key="FileSize" />
+            <converters:LocalTimeConverter x:Key="LocalTime" />
+            <converters:EnumMatchConverter x:Key="EnumMatch" />
+            <converters:BooleanNegationConverter x:Key="Not" />
+            <converters:ResourceLookupConverter x:Key="ResourceLookup" />
+            <converters:PercentToWidthConverter x:Key="PercentToWidth" />
+
+            <!-- Application-wide defaults. -->
+            <Style TargetType="ToolTip" BasedOn="{StaticResource ToolTip.Default}" />
+
+            <Style TargetType="ContextMenu" BasedOn="{StaticResource ContextMenu.Default}" />
+            <Style TargetType="MenuItem" BasedOn="{StaticResource MenuItem.Default}" />
+            <Style TargetType="Separator" BasedOn="{StaticResource Separator.Menu}" />
+
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource Fonts.Ui}" />
+                <Setter Property="FontSize" Value="{StaticResource Font.Size.Body}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.TextPrimary}" />
+                <Setter Property="TextOptions.TextFormattingMode" Value="Ideal" />
+                <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>

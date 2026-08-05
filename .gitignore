@@ -2,9 +2,9 @@
 **/bin/
 **/obj/
 TestResults/
-artifacts/release/
-artifacts/update/
-artifacts/tools/
+# artifacts/ is disposable build output only. Nothing tracked may live here, so that
+# deleting the whole folder for a clean build can never destroy a source file.
+artifacts/
 dist/
 *.zip
 *.zip.sha256

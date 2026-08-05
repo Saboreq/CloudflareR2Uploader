@@ -8,6 +8,7 @@ Add-Type -AssemblyName System.Drawing
 $repositoryRoot = [System.IO.Path]::GetFullPath(
     (Join-Path -Path $PSScriptRoot -ChildPath '..'))
 $outputPath = Join-Path -Path $repositoryRoot -ChildPath 'src\CloudflareR2Uploader\Resources\app.ico'
+$wpfOutputPath = Join-Path -Path $repositoryRoot -ChildPath 'src\CloudflareR2Uploader.Wpf\Resources\app.ico'
 
 function New-RoundedRectanglePath {
     param(
@@ -146,4 +147,10 @@ finally {
     $file.Dispose()
 }
 
-Write-Host "Generated Saboreq brand icon: $outputPath"
+$wpfOutputDirectory = Split-Path -Path $wpfOutputPath -Parent
+if (-not (Test-Path -LiteralPath $wpfOutputDirectory -PathType Container)) {
+    New-Item -ItemType Directory -Path $wpfOutputDirectory | Out-Null
+}
+Copy-Item -LiteralPath $outputPath -Destination $wpfOutputPath -Force
+
+Write-Host "Generated Saboreq brand icons: $outputPath and $wpfOutputPath"

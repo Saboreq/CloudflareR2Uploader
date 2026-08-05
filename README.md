@@ -5,7 +5,7 @@
 
 Cloudflare R2 Uploader is a Windows desktop client for uploading, browsing, previewing, downloading, and managing objects through Cloudflare R2's S3-compatible API. It keeps credentials protected with Windows DPAPI and supports resumable multipart uploads without a Worker, mounted drive, or background service.
 
-![Cloudflare R2 Uploader main window](artifacts/cloudflare-r2-uploader.png)
+![Cloudflare R2 Uploader main window](docs/images/cloudflare-r2-uploader.png)
 
 ## Highlights
 
@@ -20,7 +20,7 @@ Cloudflare R2 Uploader is a Windows desktop client for uploading, browsing, prev
 ## Supported Windows and requirements
 
 - Windows 10 or Windows 11.
-- .NET Framework 4.8.
+- Microsoft .NET 10 Desktop Runtime (x64). The installer checks this prerequisite before changing the installation.
 - A Cloudflare account, R2 bucket, and bucket-scoped R2 S3 credentials.
 - Microsoft Edge WebView2 Evergreen Runtime for PDF/rich WebView2 previews. WebView2 is optional for uploads, browsing, text/image previews, and Properties; the application remains usable when the runtime is absent.
 
@@ -88,7 +88,7 @@ A per-user named mutex and pipe ensure a second launch activates the existing wi
 
 ## Updates
 
-Installer builds can contain a publisher-configured HTTPS manifest URL. When automatic checks are enabled, the app checks once after startup. If a higher SemVer release exists, it shows the version, size, and release notes and asks whether to update. Selecting **Not now** changes nothing. Selecting **Update now** downloads the setup EXE, verifies the manifest-declared byte length and SHA-256, asks before interrupting active uploads, then runs the installer and restarts the app.
+Installer builds can contain a publisher-configured HTTPS manifest URL. When automatic checks are enabled, the app checks once after startup and shows a notification when a higher SemVer release exists. The Updates settings page shows the version, size, and release notes. **Download and install** retrieves the setup EXE, verifies the manifest-declared byte length and SHA-256, asks for final consent, preserves or discards active multipart state according to the user's choice, then runs the installer and restarts the app.
 
 Updates are never installed silently. Automatic checks can be disabled in Settings, and **Check for updates...** is available from the tray menu. See [deploy/README.md](deploy/README.md) for the dedicated Cloudflare R2 bucket, custom-domain, immutable installer, and manifest-last publishing setup.
 
@@ -108,9 +108,17 @@ Preview cache content can contain private object data. Protect the Windows accou
 
 ## Build, test, and package locally
 
-Install Visual Studio 2022 with the .NET desktop development workload and .NET Framework 4.8 targeting pack, plus Inno Setup 6 or 7. The solution remains legacy non-SDK C# 7.3. Pass a nonstandard compiler location with `-InnoSetupCompiler <path-to-ISCC.exe>`.
+Install the .NET 10 SDK with Windows desktop targeting plus Inno Setup 6 or 7. `CloudflareR2Uploader.Wpf.sln` is the SDK-style production solution; the older `CloudflareR2Uploader.sln` remains only as a compatibility gate while the migration is reviewed. Pass a nonstandard compiler location with `-InnoSetupCompiler <path-to-ISCC.exe>`.
 
-Run the full restore, Release rebuild, MSTest suite, payload validation, and single-EXE installer build:
+Run the modern build and tests directly with:
+
+```powershell
+dotnet restore .\CloudflareR2Uploader.Wpf.sln
+dotnet build .\CloudflareR2Uploader.Wpf.sln -c Debug --no-restore
+dotnet test .\CloudflareR2Uploader.Wpf.sln -c Debug --no-build
+```
+
+Run the full restore, Release build, modern MSTest suite, framework-dependent x64 WPF publish, payload validation, and single-EXE installer build:
 
 ```powershell
 .\build\Build-Release.ps1 -Version 1.2.3
@@ -149,6 +157,6 @@ See [docs/RELEASING.md](docs/RELEASING.md) for release verification and failure 
 
 ## Contributing, security, components, and license status
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing the legacy projects. Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Direct dependencies and licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing the application or compatibility projects. Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Direct dependencies and licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 This repository currently contains no application `LICENSE` file, so no application license is asserted here. Third-party components retain their own licenses.

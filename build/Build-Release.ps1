@@ -15,10 +15,8 @@ $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$solutionPath = Join-Path $repositoryRoot 'CloudflareR2Uploader.sln'
-$applicationAssemblyInfo = Join-Path $repositoryRoot 'src\CloudflareR2Uploader\Properties\AssemblyInfo.cs'
-$releaseOutput = Join-Path $repositoryRoot ("src\CloudflareR2Uploader\bin\{0}" -f $Configuration)
-$testAssembly = Join-Path $repositoryRoot ("tests\CloudflareR2Uploader.Tests\bin\{0}\CloudflareR2Uploader.Tests.dll" -f $Configuration)
+$solutionPath = Join-Path $repositoryRoot 'CloudflareR2Uploader.Wpf.sln'
+$applicationProject = Join-Path $repositoryRoot 'src\CloudflareR2Uploader.Wpf\CloudflareR2Uploader.Wpf.csproj'
 $testResults = Join-Path $repositoryRoot 'TestResults'
 $resolvedOutput = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory)) }
 $stagingRoot = Join-Path $repositoryRoot 'artifacts\release'
@@ -27,6 +25,11 @@ $stagingDirectory = Join-Path $stagingRoot ($packageName + '-payload')
 $installerPath = Join-Path $resolvedOutput ($packageName + '-Setup.exe')
 $installerScript = Join-Path $repositoryRoot 'installer\CloudflareR2Uploader.iss'
 $iconGenerator = Join-Path $PSScriptRoot 'Generate-BrandIcon.ps1'
+
+# Documentation assets shipped beside the README inside the install directory. These live
+# under docs/ rather than under artifacts/, because artifacts/ is disposable build output
+# that a clean build is expected to delete wholesale.
+$readmeImageRelative = 'docs\images\cloudflare-r2-uploader.png'
 
 if ($Version -notmatch '^(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$') {
     throw "Version '$Version' is not supported. Use SemVer such as 1.2.3 or 1.2.3-beta.1."
@@ -43,13 +46,23 @@ if (-not [string]::IsNullOrWhiteSpace($UpdateBaseUrl)) {
 if ($UpdatePrefix -notmatch '^[0-9A-Za-z][0-9A-Za-z._/-]*$' -or $UpdatePrefix.Contains('..')) { throw 'UpdatePrefix contains unsupported path characters.' }
 $UpdatePrefix = $UpdatePrefix.Trim('/')
 
-$vswherePath = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio\Installer\vswhere.exe'
-if (-not (Test-Path -LiteralPath $vswherePath -PathType Leaf)) { throw 'vswhere.exe was not found. Install Visual Studio with the .NET desktop development workload.' }
-$visualStudioPath = & $vswherePath -latest -products * -requires Microsoft.Component.MSBuild -property installationPath
-if ([string]::IsNullOrWhiteSpace($visualStudioPath)) { throw 'A Visual Studio installation containing MSBuild was not found.' }
-$msbuildPath = Join-Path $visualStudioPath 'MSBuild\Current\Bin\MSBuild.exe'
-$vstestPath = Join-Path $visualStudioPath 'Common7\IDE\CommonExtensions\Microsoft\TestWindow\vstest.console.exe'
-if (-not (Test-Path -LiteralPath $msbuildPath -PathType Leaf)) { throw "MSBuild was not found at $msbuildPath" }
+$dotnet = Get-Command dotnet -ErrorAction Stop
+
+# Every repository file the package needs is checked before anything is built, so a missing
+# input fails in a second with an actionable message instead of surfacing as a raw
+# Copy-Item error several minutes into the run.
+$requiredInputs = @(
+    'README.md',
+    'THIRD-PARTY-NOTICES.md',
+    'installer\CloudflareR2Uploader.iss',
+    $readmeImageRelative
+)
+$missingInputs = @($requiredInputs | Where-Object { -not (Test-Path -LiteralPath (Join-Path $repositoryRoot $_) -PathType Leaf) })
+if ($missingInputs.Count -gt 0) {
+    throw ("These files are required to build the package but are missing from the repository: " +
+        ($missingInputs -join ', ') +
+        ". Restore them (git checkout -- <path>) and run this script again.")
+}
 
 if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
     $innoCandidates = @(
@@ -67,46 +80,32 @@ if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler) -or -not (Test-Path -Litera
 }
 $InnoSetupCompiler = [System.IO.Path]::GetFullPath($InnoSetupCompiler)
 
-function Set-ReleaseVersion([string]$content) {
-    $result = [regex]::Replace($content, 'AssemblyVersion\("[^"]+"\)', "AssemblyVersion(`"$numericVersion`")")
-    $result = [regex]::Replace($result, 'AssemblyFileVersion\("[^"]+"\)', "AssemblyFileVersion(`"$numericVersion`")")
-    if ($result -match 'AssemblyInformationalVersion\("[^"]+"\)') {
-        $result = [regex]::Replace($result, 'AssemblyInformationalVersion\("[^"]+"\)', "AssemblyInformationalVersion(`"$Version`")")
-    } else {
-        $result += "`r`n[assembly: AssemblyInformationalVersion(`"$Version`")]`r`n"
-    }
-    return $result
-}
-
-$originalApplicationAssemblyInfo = [System.IO.File]::ReadAllText($applicationAssemblyInfo)
 try {
-    [System.IO.File]::WriteAllText($applicationAssemblyInfo, (Set-ReleaseVersion $originalApplicationAssemblyInfo), [System.Text.UTF8Encoding]::new($false))
-
     & $iconGenerator
-    if ($LASTEXITCODE -ne 0) { throw "The icon generator failed with exit code $LASTEXITCODE." }
-    & $msbuildPath $solutionPath -t:Restore -p:Configuration=$Configuration -m -v:minimal -nologo
-    if ($LASTEXITCODE -ne 0) { throw "NuGet restore failed with exit code $LASTEXITCODE." }
-    & $msbuildPath $solutionPath -t:Rebuild -p:Configuration=$Configuration -m -v:minimal -nologo
+    if (-not $?) { throw 'The icon generator failed.' }
+    & $dotnet.Source restore $solutionPath --nologo
+    if ($LASTEXITCODE -ne 0) { throw "dotnet restore failed with exit code $LASTEXITCODE." }
+    & $dotnet.Source build $solutionPath -c $Configuration --no-restore --nologo -v:minimal "/p:Version=$Version" "/p:AssemblyVersion=$numericVersion" "/p:FileVersion=$numericVersion" "/p:InformationalVersion=$Version"
     if ($LASTEXITCODE -ne 0) { throw "The $Configuration build failed with exit code $LASTEXITCODE." }
 
     if (-not $SkipTests) {
-        if (-not (Test-Path -LiteralPath $vstestPath -PathType Leaf)) { throw "VSTest was not found at $vstestPath" }
         if (Test-Path -LiteralPath $testResults) { Remove-Item -LiteralPath $testResults -Recurse -Force }
         New-Item -ItemType Directory -Path $testResults | Out-Null
-        & $vstestPath $testAssembly '/Platform:x64' '/Logger:trx;LogFileName=CloudflareR2Uploader.Tests.trx' ("/ResultsDirectory:{0}" -f $testResults)
+        & $dotnet.Source test $solutionPath -c $Configuration --no-build --nologo -v:minimal --logger trx --results-directory $testResults
         if ($LASTEXITCODE -ne 0) { throw "The automated tests failed with exit code $LASTEXITCODE." }
     }
 
     if (Test-Path -LiteralPath $stagingDirectory) { Remove-Item -LiteralPath $stagingDirectory -Recurse -Force }
-    New-Item -ItemType Directory -Path $stagingDirectory | Out-Null
-    Get-ChildItem -LiteralPath $releaseOutput -File | Where-Object { $_.Extension -ne '.pdb' } | ForEach-Object { Copy-Item -LiteralPath $_.FullName -Destination $stagingDirectory }
-    $runtimeSource = Join-Path $releaseOutput 'runtimes'
-    if (Test-Path -LiteralPath $runtimeSource) { Copy-Item -LiteralPath $runtimeSource -Destination $stagingDirectory -Recurse }
+    & $dotnet.Source publish $applicationProject -c $Configuration -r win-x64 --self-contained false --no-restore --nologo -v:minimal -o $stagingDirectory "/p:Version=$Version" "/p:AssemblyVersion=$numericVersion" "/p:FileVersion=$numericVersion" "/p:InformationalVersion=$Version" /p:PublishSingleFile=false
+    if ($LASTEXITCODE -ne 0) { throw "The WPF publish failed with exit code $LASTEXITCODE." }
+    Get-ChildItem -LiteralPath $stagingDirectory -Recurse -Filter '*.pdb' | Remove-Item -Force
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'README.md') -Destination $stagingDirectory
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD-PARTY-NOTICES.md') -Destination $stagingDirectory
-    $packageArtifacts = Join-Path $stagingDirectory 'artifacts'
-    New-Item -ItemType Directory -Path $packageArtifacts | Out-Null
-    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'artifacts\cloudflare-r2-uploader.png') -Destination $packageArtifacts
+    # The image keeps its repository-relative path inside the payload so the README's own
+    # link still resolves when it is read from the install directory.
+    $packageImage = Join-Path $stagingDirectory $readmeImageRelative
+    New-Item -ItemType Directory -Path (Split-Path -Parent $packageImage) -Force | Out-Null
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot $readmeImageRelative) -Destination $packageImage
     $licensePath = Join-Path $repositoryRoot 'LICENSE'
     if (Test-Path -LiteralPath $licensePath -PathType Leaf) { Copy-Item -LiteralPath $licensePath -Destination $stagingDirectory }
 
@@ -121,10 +120,12 @@ try {
 
     $expected = @(
         'CloudflareR2Uploader.exe',
-        'CloudflareR2Uploader.exe.config',
+        'CloudflareR2Uploader.dll',
+        'CloudflareR2Uploader.deps.json',
+        'CloudflareR2Uploader.runtimeconfig.json',
         'README.md',
         'THIRD-PARTY-NOTICES.md',
-        'artifacts\cloudflare-r2-uploader.png',
+        $readmeImageRelative,
         'runtimes\win-x86\native\WebView2Loader.dll',
         'runtimes\win-x64\native\WebView2Loader.dll',
         'runtimes\win-arm64\native\WebView2Loader.dll'
@@ -166,7 +167,6 @@ try {
     Write-Host ('SHA-256: {0}' -f $hash)
 }
 finally {
-    [System.IO.File]::WriteAllText($applicationAssemblyInfo, $originalApplicationAssemblyInfo, [System.Text.UTF8Encoding]::new($false))
     if (-not $KeepStaging) {
         if (Test-Path -LiteralPath $stagingDirectory) { Remove-Item -LiteralPath $stagingDirectory -Recurse -Force }
     }
