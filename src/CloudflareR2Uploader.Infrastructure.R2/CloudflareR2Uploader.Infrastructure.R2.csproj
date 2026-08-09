@@ -17,7 +17,7 @@
   <ItemGroup>
     <!-- Pinned to the exact versions the WinForms build ships, so request shapes and
          multipart behaviour are identical across both front ends. -->
-    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102" />
     <PackageReference Include="MetadataExtractor" Version="2.9.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>

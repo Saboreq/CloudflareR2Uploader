@@ -53,7 +53,7 @@
   </ItemGroup>
   <ItemGroup>
     <PackageReference Include="AWSSDK.S3">
-      <Version>3.7.511.8</Version>
+      <Version>4.0.102</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Web.WebView2">
       <Version>1.0.4078.44</Version>
