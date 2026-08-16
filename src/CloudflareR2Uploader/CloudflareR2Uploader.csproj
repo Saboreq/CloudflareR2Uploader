@@ -56,7 +56,7 @@
       <Version>3.7.511.8</Version>
     </PackageReference>
     <PackageReference Include="Microsoft.Web.WebView2">
-      <Version>1.0.4078.44</Version>
+      <Version>1.0.4129.50</Version>
     </PackageReference>
     <PackageReference Include="Ookii.Dialogs.WinForms">
       <Version>4.0.0</Version>
@@ -72,7 +72,7 @@
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
     <PackageReference Include="Fody">
-      <Version>6.8.1</Version>
+      <Version>6.9.3</Version>
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
