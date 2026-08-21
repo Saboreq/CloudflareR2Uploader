@@ -10,7 +10,7 @@
   <ItemGroup>
     <!-- Pinned versions preserve the supported Cloudflare R2 request shapes and
          multipart-upload behaviour. -->
-    <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
+    <PackageReference Include="AWSSDK.S3" Version="4.0.102.3" />
     <PackageReference Include="MetadataExtractor" Version="2.9.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
   </ItemGroup>
