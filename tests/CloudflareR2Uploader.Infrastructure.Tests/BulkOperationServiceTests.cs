@@ -663,7 +663,15 @@ namespace CloudflareR2Uploader.Tests
                     Settings(), Credentials(), plan, BulkConflictBehavior.RenameAutomatically,
                     null, null, CancellationToken.None);
 
+                Assert.IsFalse(result.Cancelled);
+                Assert.AreEqual(1, result.Completed);
                 Assert.AreEqual(1, result.Succeeded);
+                Assert.AreEqual(0, result.Skipped);
+                Assert.AreEqual(0, result.Failures.Count,
+                    result.Failures.Count == 0 ? null : result.Failures[0].Message);
+                Assert.AreEqual(8, result.TransferredBytes);
+                Assert.IsTrue(File.Exists(target), "The successful result did not publish its target.");
+                Assert.AreEqual("download", File.ReadAllText(target));
                 Assert.AreEqual(timestamp, File.GetLastWriteTimeUtc(target));
             }
         }

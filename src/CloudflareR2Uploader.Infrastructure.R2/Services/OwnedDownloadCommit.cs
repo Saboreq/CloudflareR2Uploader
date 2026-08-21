@@ -82,6 +82,27 @@ namespace CloudflareR2Uploader.Services
                 Path.Combine(directory, CreateWindowsCommitFileName()));
         }
 
+        internal static string ToWindowsNativePublishPath(string target)
+        {
+            if (string.IsNullOrEmpty(target) || target.Contains('\0'))
+                throw new ArgumentException("A Windows publication target must be an absolute DOS or UNC path.", nameof(target));
+
+            if (target.StartsWith(@"\\?\", StringComparison.Ordinal))
+            {
+                if (IsExtendedDosPath(target) || IsExtendedUncPath(target)) return target;
+                throw new ArgumentException("The extended Windows publication target is invalid.", nameof(target));
+            }
+
+            string normalized = target.Replace('/', '\\');
+            if (normalized.StartsWith(@"\\.\", StringComparison.Ordinal))
+                throw new ArgumentException("Windows device paths are not publication targets.", nameof(target));
+            if (IsDosPath(normalized, 0)) return @"\\?\" + normalized;
+            if (IsUncPath(normalized, 2))
+                return string.Concat(@"\\?\UNC\", normalized.AsSpan(2));
+
+            throw new ArgumentException("A Windows publication target must be an absolute DOS or UNC path.", nameof(target));
+        }
+
         public static OwnedDownloadCommit Create(string target)
         {
             return Create(target, null);
@@ -248,7 +269,8 @@ namespace CloudflareR2Uploader.Services
                 bool overwrite,
                 out int nativeError)
             {
-                byte[] targetBytes = Encoding.Unicode.GetBytes(target);
+                string nativeTarget = ToWindowsNativePublishPath(target);
+                byte[] targetBytes = Encoding.Unicode.GetBytes(nativeTarget);
                 int fileNameOffset = Marshal.OffsetOf<FileRenameInformation>(nameof(FileRenameInformation.FileName)).ToInt32();
                 IntPtr buffer = Marshal.AllocHGlobal(fileNameOffset + targetBytes.Length);
                 try
@@ -300,6 +322,37 @@ namespace CloudflareR2Uploader.Services
                 nativeError = removed ? 0 : Marshal.GetLastPInvokeError();
                 return removed;
             }
+        }
+
+        private static bool IsExtendedDosPath(string path)
+        {
+            return IsDosPath(path, 4);
+        }
+
+        private static bool IsExtendedUncPath(string path)
+        {
+            return path.Length > 8 &&
+                path.AsSpan(4, 4).Equals("UNC\\".AsSpan(), StringComparison.OrdinalIgnoreCase) &&
+                IsUncPath(path, 8);
+        }
+
+        private static bool IsDosPath(string path, int offset)
+        {
+            return path.Length > offset + 3 &&
+                char.IsAsciiLetter(path[offset]) &&
+                path[offset + 1] == ':' &&
+                path[offset + 2] == '\\' &&
+                path[offset + 3] != '\\';
+        }
+
+        private static bool IsUncPath(string path, int offset)
+        {
+            int serverEnd = path.IndexOf('\\', offset);
+            if (serverEnd <= offset) return false;
+            int shareEnd = path.IndexOf('\\', serverEnd + 1);
+            return shareEnd > serverEnd + 1 &&
+                shareEnd + 1 < path.Length &&
+                path[shareEnd + 1] != '\\';
         }
 
         private static byte[] Utf8Path(string path)

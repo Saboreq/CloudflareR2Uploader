@@ -234,6 +234,94 @@ namespace CloudflareR2Uploader.Tests
             Assert.IsTrue(commitPath.Length > 260);
         }
 
+        [DataTestMethod]
+        [DataRow(@"C:\downloads\report.txt", @"\\?\C:\downloads\report.txt")]
+        [DataRow(@"C:/downloads/report.txt", @"\\?\C:\downloads\report.txt")]
+        [DataRow(@"\\server\share\report.txt", @"\\?\UNC\server\share\report.txt")]
+        [DataRow(@"\\?\C:\downloads\report.txt", @"\\?\C:\downloads\report.txt")]
+        [DataRow(@"\\?\UNC\server\share\report.txt", @"\\?\UNC\server\share\report.txt")]
+        public void WindowsNativePublishPath_EncodesEveryAbsoluteDosOrUncTarget(
+            string target,
+            string expected)
+        {
+            Assert.AreEqual(expected, OwnedDownloadCommit.ToWindowsNativePublishPath(target));
+        }
+
+        [TestMethod]
+        public void WindowsNativePublishPath_RejectsRelativeAndInvalidTargets()
+        {
+            string[] invalidTargets =
+            {
+                null,
+                string.Empty,
+                "report.txt",
+                @"C:report.txt",
+                @"\rooted.txt",
+                @"\\server",
+                @"\\server\share",
+                @"\\?\relative",
+                @"\\.\C:\report.txt",
+                "C:\\bad\0name.txt"
+            };
+
+            foreach (string target in invalidTargets)
+            {
+                Assert.ThrowsException<ArgumentException>(
+                    () => OwnedDownloadCommit.ToWindowsNativePublishPath(target),
+                    "Target was accepted: " + (target ?? "<null>"));
+            }
+        }
+
+        [TestMethod]
+        public void WindowsShortNonOverwrite_PublishesExactFinalPath()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            using (TemporaryDirectory directory = new TemporaryDirectory())
+            {
+                string target = directory.File("short-new.txt");
+                using (OwnedDownloadCommit commit = OwnedDownloadCommit.Create(target, null))
+                {
+                    using (StreamWriter writer = new StreamWriter(commit.Stream, leaveOpen: true))
+                    {
+                        writer.Write("download");
+                    }
+                    commit.Stream.Flush(true);
+
+                    Assert.IsTrue(commit.TryPublish(target, false));
+                }
+
+                Assert.AreEqual("download", File.ReadAllText(target));
+                Assert.AreEqual(0, Directory.GetFiles(directory.Path, ".r2c-*").Length);
+            }
+        }
+
+        [TestMethod]
+        public void WindowsShortNonOverwrite_CollisionCanRetryAtExactAlternatePath()
+        {
+            if (!OperatingSystem.IsWindows()) return;
+            using (TemporaryDirectory directory = new TemporaryDirectory())
+            {
+                string occupiedTarget = directory.File("occupied.txt");
+                string retryTarget = directory.File("retry.txt");
+                File.WriteAllText(occupiedTarget, "external");
+                using (OwnedDownloadCommit commit = OwnedDownloadCommit.Create(occupiedTarget, null))
+                {
+                    using (StreamWriter writer = new StreamWriter(commit.Stream, leaveOpen: true))
+                    {
+                        writer.Write("download");
+                    }
+                    commit.Stream.Flush(true);
+
+                    Assert.IsFalse(commit.TryPublish(occupiedTarget, false));
+                    Assert.IsTrue(commit.TryPublish(retryTarget, false));
+                }
+
+                Assert.AreEqual("external", File.ReadAllText(occupiedTarget));
+                Assert.AreEqual("download", File.ReadAllText(retryTarget));
+                Assert.AreEqual(0, Directory.GetFiles(directory.Path, ".r2c-*").Length);
+            }
+        }
+
         [TestMethod]
         public void WindowsLongDirectoryAndNearComponent_PublishesExactFinalPath()
         {
@@ -299,7 +387,7 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
-        public void WindowsOverwrite_ReplacesExactBytesWithoutCommitOrTemporaryAttribute()
+        public void WindowsShortOverwrite_ReplacesExactBytesWithoutCommitOrTemporaryAttribute()
         {
             if (!OperatingSystem.IsWindows()) return;
             using (TemporaryDirectory directory = new TemporaryDirectory())
