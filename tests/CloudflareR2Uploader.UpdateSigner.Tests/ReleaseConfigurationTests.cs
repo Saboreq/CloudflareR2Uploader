@@ -311,26 +311,23 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
-        public void Publisher_SignerForwardersAllowRequiredEmptyArgumentValues()
+        public void Publisher_OmitsEmptyNativeNotesAndSignerDefaultsMissingNotes()
         {
             string publisher = ReadRepositoryFile("deploy", "Publish-CloudflareUpdate.ps1");
+            string signer = ReadRepositoryFile(
+                "tools", "CloudflareR2Uploader.UpdateSigner", "Program.cs");
 
-            int signer = publisher.IndexOf("function Invoke-Signer", StringComparison.Ordinal);
-            int certificateSigner = publisher.IndexOf("function Invoke-CertificateSigner", StringComparison.Ordinal);
-            int wrangler = publisher.IndexOf("function Invoke-Wrangler", StringComparison.Ordinal);
-            Assert.IsTrue(signer >= 0 && certificateSigner > signer && wrangler > certificateSigner);
-            int signerAllowance = publisher.IndexOf("[AllowEmptyString()]", signer, StringComparison.Ordinal);
-            int certificateSignerAllowance = publisher.IndexOf(
-                "[AllowEmptyString()]", certificateSigner, StringComparison.Ordinal);
-            Assert.IsTrue(
-                signerAllowance > signer && signerAllowance < certificateSigner,
-                "The direct signer wrapper must accept an empty argument element.");
-            Assert.IsTrue(
-                certificateSignerAllowance > certificateSigner && certificateSignerAllowance < wrangler,
-                "The certificate signer wrapper must accept an empty argument element.");
-            StringAssert.Contains(
-                publisher,
-                "'--installer-url', $installerUrl, '--notes', $ReleaseNotes,");
+            StringAssert.Contains(publisher, "$signArguments = @(");
+            StringAssert.Contains(publisher, "if (-not [string]::IsNullOrEmpty($ReleaseNotes))");
+            StringAssert.Contains(publisher, "$signArguments += @('--notes', $ReleaseNotes)");
+            StringAssert.Contains(publisher, "Invoke-CertificateSigner -Arguments $signArguments");
+            Assert.IsFalse(
+                publisher.Contains("'--notes', $ReleaseNotes,", StringComparison.Ordinal),
+                "Empty notes must not depend on native empty-argument preservation.");
+            StringAssert.Contains(signer, "SignOptionalValueOptions = [\"--notes\"];");
+            StringAssert.Contains(signer, "SignOptionalValueOptions,");
+            StringAssert.Contains(signer, "options.TryGetValue(\"--notes\"");
+            StringAssert.Contains(signer, "[--notes TEXT]");
         }
 
         [TestMethod]

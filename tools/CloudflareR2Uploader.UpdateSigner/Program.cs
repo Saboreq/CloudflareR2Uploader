@@ -25,6 +25,7 @@ namespace CloudflareR2Uploader.UpdateSigner
         private const long MaximumInstallerBytes = 256L * 1024L * 1024L;
         private const int MaximumManifestBytes = 64 * 1024;
         private static readonly UTF8Encoding Utf8WithoutBom = new UTF8Encoding(false, true);
+        private static readonly string[] SignOptionalValueOptions = ["--notes"];
         private static readonly JsonSerializerOptions WriteJsonOptions = new JsonSerializerOptions
         {
             WriteIndented = true
@@ -52,12 +53,12 @@ namespace CloudflareR2Uploader.UpdateSigner
                         Sign(ParseOptionsWithOptional(
                             args,
                             "--held-read-lock",
+                            SignOptionalValueOptions,
                             "--pfx",
                             "--password-env",
                             "--version",
                             "--installer",
                             "--installer-url",
-                            "--notes",
                             "--output"), output);
                         break;
                     case "validate-public-key":
@@ -81,6 +82,7 @@ namespace CloudflareR2Uploader.UpdateSigner
                         VerifyInstaller(ParseOptionsWithOptional(
                             args,
                             "--held-read-lock",
+                            Array.Empty<string>(),
                             "--manifest",
                             "--public-key",
                             "--installer"), output);
@@ -159,6 +161,9 @@ namespace CloudflareR2Uploader.UpdateSigner
             using (FileStream input = new FileStream(
                 installer.FullName, FileMode.Open, FileAccess.Read, installerShare))
                 hash = Convert.ToHexStringLower(SHA256.HashData(input));
+            string notes = options.TryGetValue("--notes", out string parsedNotes)
+                ? parsedNotes
+                : string.Empty;
 
             UpdateManifest manifest = new UpdateManifest
             {
@@ -168,7 +173,7 @@ namespace CloudflareR2Uploader.UpdateSigner
                 Sha256 = hash,
                 SizeBytes = installer.Length,
                 PublishedUtc = DateTimeOffset.UtcNow,
-                Notes = options["--notes"]
+                Notes = notes
             };
 
             using X509Certificate2 certificate = LoadSigningCertificate(options);
@@ -316,12 +321,14 @@ namespace CloudflareR2Uploader.UpdateSigner
         private static Dictionary<string, string> ParseOptionsWithOptional(
             string[] args,
             string optionalOption,
+            string[] optionalValueOptions,
             params string[] requiredOptions)
         {
             HashSet<string> allowed = new HashSet<string>(requiredOptions, StringComparer.Ordinal)
             {
                 optionalOption
             };
+            allowed.UnionWith(optionalValueOptions);
             Dictionary<string, string> values = new Dictionary<string, string>(StringComparer.Ordinal);
             for (int index = 1; index < args.Length; index += 2)
             {
@@ -417,7 +424,7 @@ namespace CloudflareR2Uploader.UpdateSigner
             "Usage:\n" +
             "  export-public-key --pfx PATH --password-env NAME\n" +
             "  sign --pfx PATH --password-env NAME --version VERSION --installer PATH " +
-            "--installer-url HTTPS_URL --notes TEXT --output PATH [--held-read-lock true]\n" +
+            "--installer-url HTTPS_URL [--notes TEXT] --output PATH [--held-read-lock true]\n" +
             "  validate-public-key --public-key BASE64_SUBJECT_PUBLIC_KEY_INFO\n" +
             "  validate-installer-metadata --installer PATH --version VERSION\n" +
             "  verify --manifest PATH --public-key BASE64_SUBJECT_PUBLIC_KEY_INFO\n" +

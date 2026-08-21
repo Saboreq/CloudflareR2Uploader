@@ -150,6 +150,33 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void Sign_OmittedNotesDefaultsToAnEmptyManifestValue()
+        {
+            using TemporaryDirectory temporary = new TemporaryDirectory();
+            string password = NewPassword();
+            string pfx = CreateRsaPfx(temporary, password, out string publicKey);
+            string installer = temporary.File("Setup.exe");
+            string manifestPath = temporary.File("manifest.json");
+            File.WriteAllBytes(installer, Encoding.UTF8.GetBytes("synthetic installer"));
+            string variable = "UPDATE_SIGNER_PASSWORD_" + Guid.NewGuid().ToString("N");
+            using EnvironmentVariableScope environment = new EnvironmentVariableScope(variable, password);
+
+            CommandResult result = Run(
+                "sign",
+                "--pfx", pfx,
+                "--password-env", variable,
+                "--version", "2.0.0",
+                "--installer", installer,
+                "--installer-url", "https://updates.example.test/releases/2.0.0/Setup.exe",
+                "--output", manifestPath);
+
+            Assert.AreEqual(0, result.ExitCode, result.Error);
+            UpdateManifest manifest = UpdateManifestJson.DeserializeManifest(File.ReadAllBytes(manifestPath));
+            Assert.AreEqual(string.Empty, manifest.Notes);
+            Assert.IsTrue(UpdateManifestSignature.Verify(manifest, publicKey));
+        }
+
+        [TestMethod]
         public void Sign_RejectsOutputThatIdentifiesInstallerOrCertificateWithoutChangingEither()
         {
             using TemporaryDirectory temporary = new TemporaryDirectory();

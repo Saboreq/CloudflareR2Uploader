@@ -130,7 +130,6 @@ try {
     function Invoke-Signer {
         param(
             [Parameter(Mandatory = $true)]
-            [AllowEmptyString()]
             [string[]]$Arguments,
             [switch]$CaptureOutput
         )
@@ -148,7 +147,6 @@ try {
     function Invoke-CertificateSigner {
         param(
             [Parameter(Mandatory = $true)]
-            [AllowEmptyString()]
             [string[]]$Arguments,
             [switch]$CaptureOutput
         )
@@ -501,12 +499,17 @@ try {
     $publicInstallerPath = Join-Path $publicationDirectory 'public-installer.bin'
     $publicManifestPath = Join-Path $publicationDirectory 'public-manifest.json'
 
-    Invoke-CertificateSigner -Arguments @(
+    $signArguments = @(
         'sign', '--pfx', $signerCertificate,
         '--password-env', $SigningCertificatePasswordEnvironmentVariable,
         '--version', $Version, '--installer', $installerSnapshot,
-        '--installer-url', $installerUrl, '--notes', $ReleaseNotes,
+        '--installer-url', $installerUrl)
+    if (-not [string]::IsNullOrEmpty($ReleaseNotes)) {
+        $signArguments += @('--notes', $ReleaseNotes)
+    }
+    $signArguments += @(
         '--output', $manifestPath, '--held-read-lock', 'true')
+    Invoke-CertificateSigner -Arguments $signArguments
     Invoke-Signer -Arguments @(
         'verify-installer', '--manifest', $manifestPath,
         '--public-key', $publicKey, '--installer', $installerSnapshot,
