@@ -38,15 +38,15 @@ namespace CloudflareR2Uploader.Wpf.ViewModels.Files
     /// <summary>
     /// The Files browser, implementing Images/01-files-browser.png.
     /// <para>
-    /// Listing, paging, filtering and sorting all preserve the WinForms behaviour exactly:
-    /// one delimiter-based <c>ListObjectsV2</c> page at a time, opaque continuation tokens
+    /// Listing, paging, filtering and sorting use one delimiter-based <c>ListObjectsV2</c>
+    /// page at a time, opaque continuation tokens
     /// held per prefix, filtering and sorting applied only to the loaded page, and folders
     /// always first.
     /// </para>
     /// </summary>
     public sealed partial class FilesViewModel : ObservableObject, IDisposable
     {
-        /// <summary>Matches the WinForms debounce, so typing never issues a request per keystroke.</summary>
+        /// <summary>Debounces filtering so typing never issues a request per keystroke.</summary>
         private static readonly TimeSpan FilterDebounce = TimeSpan.FromMilliseconds(250);
 
         private static readonly TimeSpan SelectionDebounce = TimeSpan.FromMilliseconds(250);

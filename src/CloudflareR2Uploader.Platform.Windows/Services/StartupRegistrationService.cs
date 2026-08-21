@@ -41,11 +41,11 @@ namespace CloudflareR2Uploader.Services
             {
                 if (enabled)
                 {
-                    if (string.IsNullOrWhiteSpace(executablePath)) throw new ArgumentException("The executable path is missing.", "executablePath");
+                    if (string.IsNullOrWhiteSpace(executablePath)) throw new ArgumentException("The executable path is missing.", nameof(executablePath));
                     string normalized = executablePath.Replace('/', '\\');
-                    if (normalized.IndexOf("\\bin\\Debug\\", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        normalized.IndexOf("testhost", StringComparison.OrdinalIgnoreCase) >= 0 ||
-                        normalized.IndexOf("vstest", StringComparison.OrdinalIgnoreCase) >= 0)
+                    if (normalized.Contains("\\bin\\Debug\\", StringComparison.OrdinalIgnoreCase) ||
+                        normalized.Contains("testhost", StringComparison.OrdinalIgnoreCase) ||
+                        normalized.Contains("vstest", StringComparison.OrdinalIgnoreCase))
                         throw new InvalidOperationException("Debug and test executables cannot be registered to start with Windows.");
                     _store.Write(ValueName, BuildCommand(executablePath));
                 }

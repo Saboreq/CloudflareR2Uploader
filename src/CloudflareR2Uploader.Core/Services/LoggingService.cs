@@ -215,7 +215,7 @@ namespace CloudflareR2Uploader.Services
         public static string ShortenUploadId(string uploadId)
         {
             if (string.IsNullOrEmpty(uploadId)) return string.Empty;
-            return uploadId.Length <= 12 ? uploadId : "…" + uploadId.Substring(uploadId.Length - 12);
+            return uploadId.Length <= 12 ? uploadId : string.Concat("…", uploadId.AsSpan(uploadId.Length - 12));
         }
 
         /// <summary>

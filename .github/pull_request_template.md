@@ -4,8 +4,8 @@ Describe the user-visible and architectural changes.
 
 ## Testing
 
-- [ ] Release build completed
-- [ ] Full automated test suite passed
+- [ ] Canonical `CloudflareR2Uploader.sln` Release build completed
+- [ ] Full .NET 10 automated test suite passed
 - [ ] Relevant manual smoke checks completed
 
 ## Screenshots
@@ -20,6 +20,6 @@ Add before/after screenshots for UI changes, or explain why none apply.
 
 ## Compatibility and hygiene
 
-- [ ] Code remains compatible with .NET Framework 4.8 and C# 7.3
-- [ ] Every new `.cs` file is explicitly listed in the legacy `.csproj`
+- [ ] Changes preserve the .NET 10 SDK-style WPF/Core/Infrastructure/Platform architecture
+- [ ] Existing settings, credential, and multipart-state migration readers remain compatible
 - [ ] No generated `bin`, `obj`, `dist`, test-result, or release files are included

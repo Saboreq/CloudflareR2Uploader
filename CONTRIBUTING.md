@@ -1,17 +1,25 @@
 # Contributing
 
-Development requires Windows 10 or 11, Visual Studio 2022 with the .NET desktop development workload, the .NET Framework 4.8 targeting pack, PowerShell 5.1 or newer, and Git. Release packaging additionally requires Inno Setup 6 or 7.
+Development requires Windows 10 or 11, the .NET 10 SDK with Windows desktop targeting, and Git. Use Visual Studio 2026 (18.0+) with the .NET desktop development workload, or use the .NET 10 CLI from another editor such as VS Code. Release packaging and the security harness require PowerShell 7+ and the reviewed Inno Setup 6.7.1 toolchain.
 
-The application is under `src/CloudflareR2Uploader`, MSTest tests are under `tests/CloudflareR2Uploader.Tests`, build automation is under `build`, and GitHub automation is under `.github/workflows`.
+`CloudflareR2Uploader.sln` is the only supported solution. Its SDK-style project graph contains the Core, Infrastructure.R2, Platform.Windows, and WPF application layers, the UpdateSigner tool, and five .NET 10 MSTest projects. The WPF project under `src/CloudflareR2Uploader.Wpf` is the only desktop frontend.
 
-Run the complete local check with:
+Run the normal developer checks from the repository root:
+
+```powershell
+dotnet restore .\CloudflareR2Uploader.sln
+dotnet build .\CloudflareR2Uploader.sln -c Release --no-restore
+dotnet test .\CloudflareR2Uploader.sln -c Release --no-build
+```
+
+Run the same build, tests, WPF publish, payload validation, and installer packaging used by CI with:
 
 ```powershell
 .\build\Build-Release.ps1 -Version 1.0.0-dev
 ```
 
-To build without packaging, restore and build `CloudflareR2Uploader.sln` in Visual Studio using `Release | Any CPU`. To rerun the compiled tests, use Visual Studio Test Explorer or the VSTest command printed by the release script.
+The release script must remain the canonical packaging entry point. Keep the PowerShell 7 security harness after the versioned build in both workflows, keep workflow permissions least-privilege, and pin external build actions and tools to reviewed immutable versions.
 
-All production and test code must remain compatible with C# 7.3 and .NET Framework 4.8. These are legacy non-SDK projects: every new `.cs` file must be explicitly added to the appropriate `.csproj`. Do not use newer language syntax or convert project formats.
+Pull requests should be focused, explain behavior and security impact, and add deterministic tests for changed logic. Include before/after screenshots for visible UI changes. Preserve settings, credential, and multipart-state migration readers when changing current schemas; those readers support existing installations even though only the .NET 10 WPF application is built.
 
-Pull requests should be focused, explain behavior and security impact, keep existing tests passing, and add deterministic tests for changed logic. Include before/after screenshots for visible UI changes, but do not commit credentials, signed URLs, bucket data, local settings, logs, preview-cache content, `bin`, `obj`, or `dist` output. Use synthetic object keys in issues and tests. Keep commits reviewable and avoid unrelated formatting churn.
+Never commit R2 credentials, signing private keys or PFX files, signing passwords, signed URLs, bucket data, local settings, logs, preview-cache content, generated manifests, `bin`, `obj`, `artifacts`, or `dist` output. Use ephemeral keys and synthetic object data in tests. Keep commits reviewable and avoid unrelated formatting or dependency churn.

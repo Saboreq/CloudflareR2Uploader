@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>CloudflareR2Uploader.UpdateSigner</RootNamespace>
+    <AssemblyName>CloudflareR2Uploader.UpdateSigner</AssemblyName>
+    <Description>Offline publisher tool for signing and verifying authenticated update manifests.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\CloudflareR2Uploader.Core\CloudflareR2Uploader.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="CloudflareR2Uploader.UpdateSigner.Tests" />
+  </ItemGroup>
+
+</Project>

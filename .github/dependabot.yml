@@ -4,18 +4,18 @@ updates:
     directory: /
     schedule:
       interval: weekly
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
     open-pull-requests-limit: 5
     groups:
-      safe-nuget-updates:
-        update-types:
-          - minor
-          - patch
+      nuget-minor-and-patch:
+        update-types: [minor, patch]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
-    open-pull-requests-limit: 5
-    groups:
-      github-actions:
-        patterns:
-          - "*"
+      day: monday
+      time: "06:00"
+      timezone: Europe/Warsaw
+    open-pull-requests-limit: 3

@@ -26,9 +26,9 @@ namespace CloudflareR2Uploader.Utilities
         /// </summary>
         public BoundedFileStream(string path, long offset, long length, int bufferSize = 81920)
         {
-            if (path == null) throw new ArgumentNullException("path");
-            if (offset < 0) throw new ArgumentOutOfRangeException("offset");
-            if (length < 0) throw new ArgumentOutOfRangeException("length");
+            ArgumentNullException.ThrowIfNull(path);
+            ArgumentOutOfRangeException.ThrowIfNegative(offset);
+            ArgumentOutOfRangeException.ThrowIfNegative(length);
 
             _inner = new FileStream(
                 PathUtility.ToExtendedLengthPath(path),
@@ -60,7 +60,7 @@ namespace CloudflareR2Uploader.Utilities
             get { return _position; }
             set
             {
-                if (value < 0 || value > _length) throw new ArgumentOutOfRangeException("value");
+                if (value < 0 || value > _length) throw new ArgumentOutOfRangeException(nameof(value));
                 _position = value;
                 _inner.Position = _offset + value;
             }
@@ -81,7 +81,17 @@ namespace CloudflareR2Uploader.Utilities
             int allowed = ClampCount(count);
             if (allowed <= 0) return 0;
 
-            int read = await _inner.ReadAsync(buffer, offset, allowed, cancellationToken).ConfigureAwait(false);
+            int read = await _inner.ReadAsync(buffer.AsMemory(offset, allowed), cancellationToken).ConfigureAwait(false);
+            _position += read;
+            return read;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            int allowed = ClampCount(buffer.Length);
+            if (allowed <= 0) return 0;
+
+            int read = await _inner.ReadAsync(buffer.Slice(0, allowed), cancellationToken).ConfigureAwait(false);
             _position += read;
             return read;
         }
@@ -94,7 +104,7 @@ namespace CloudflareR2Uploader.Utilities
                 case SeekOrigin.Begin: target = offset; break;
                 case SeekOrigin.Current: target = _position + offset; break;
                 case SeekOrigin.End: target = _length + offset; break;
-                default: throw new ArgumentOutOfRangeException("origin");
+                default: throw new ArgumentOutOfRangeException(nameof(origin));
             }
 
             if (target < 0 || target > _length)

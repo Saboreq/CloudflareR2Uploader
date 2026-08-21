@@ -20,6 +20,7 @@ namespace CloudflareR2Uploader.Services
 
         private readonly ILoggingService _log;
         private readonly R2UploadService _uploadService;
+        private readonly Func<AppSettings, R2Credentials, AmazonS3Client> _clientFactory = R2ClientFactory.CreateClient;
 
         public R2ObjectOperationService(ILoggingService log, UploadStateStore stateStore)
         {
@@ -35,7 +36,7 @@ namespace CloudflareR2Uploader.Services
             IProgress<R2ObjectOperationProgress> progress,
             CancellationToken cancellationToken)
         {
-            if (string.IsNullOrEmpty(destinationPath)) throw new ArgumentException("A destination path is required.", "destinationPath");
+            if (string.IsNullOrEmpty(destinationPath)) throw new ArgumentException("A destination path is required.", nameof(destinationPath));
 
             string directory = Path.GetDirectoryName(destinationPath);
             if (string.IsNullOrEmpty(directory) || !Directory.Exists(directory))
@@ -49,7 +50,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 using (GetObjectResponse response = await client.GetObjectAsync(
                     new GetObjectRequest { BucketName = settings.BucketName, Key = objectKey },
                     cancellationToken).ConfigureAwait(false))
@@ -126,7 +127,7 @@ namespace CloudflareR2Uploader.Services
             {
                 try
                 {
-                    client = R2ClientFactory.CreateClient(uploadSettings, credentials);
+                    client = _clientFactory(uploadSettings, credentials);
                     return await _uploadService.UploadAsync(
                         client,
                         item,
@@ -154,7 +155,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 if (!item.IsFolder)
                 {
                     await DeleteKeyAsync(client, settings, item.Key, cancellationToken).ConfigureAwait(false);
@@ -216,7 +217,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 RetryService retry = new RetryService(_log, settings.RetryAttempts);
 
                 if (!item.IsFolder)
@@ -303,7 +304,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 if (!await NameExistsAsync(
                     client, settings.BucketName, proposedDestination, isFolder, cancellationToken).ConfigureAwait(false))
                     return proposedDestination;
@@ -334,7 +335,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 return await ExistsAsync(client, settings.BucketName, destination, isFolder, cancellationToken).ConfigureAwait(false);
             }
             finally
@@ -353,7 +354,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 return await NameExistsAsync(
                     client, settings.BucketName, destination, isFolder, cancellationToken).ConfigureAwait(false);
             }
@@ -382,7 +383,7 @@ namespace CloudflareR2Uploader.Services
             AmazonS3Client client = null;
             try
             {
-                client = R2ClientFactory.CreateClient(settings, credentials);
+                client = _clientFactory(settings, credentials);
                 if (await NameExistsAsync(
                     client, settings.BucketName, normalized, true, cancellationToken).ConfigureAwait(false))
                 {
@@ -394,7 +395,7 @@ namespace CloudflareR2Uploader.Services
                     "PutFolderMarker",
                     async token =>
                     {
-                        using (MemoryStream content = new MemoryStream(new byte[0], false))
+                        using (MemoryStream content = new MemoryStream(Array.Empty<byte>(), false))
                         {
                             PutObjectRequest request = new PutObjectRequest
                             {
@@ -423,7 +424,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private async Task CopyOneAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             RetryService retry,
             AppSettings settings,
             string sourceKey,
@@ -465,7 +466,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private async Task MultipartCopyAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             RetryService retry,
             AppSettings settings,
             string sourceKey,
@@ -567,7 +568,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task EnsureSourceUnchangedAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             AppSettings settings,
             string key,
             long expectedSize,
@@ -587,7 +588,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task EnsurePrefixUnchangedAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             AppSettings settings,
             string prefix,
             IList<SourceSnapshot> expected,
@@ -637,7 +638,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task DeleteSnapshotsAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             AppSettings settings,
             IList<SourceSnapshot> snapshots,
             IProgress<R2ObjectOperationProgress> progress,
@@ -658,7 +659,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task DeleteKeyAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             AppSettings settings,
             string key,
             CancellationToken cancellationToken)
@@ -669,7 +670,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task DeleteBatchAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             AppSettings settings,
             List<KeyVersion> keys,
             CancellationToken cancellationToken)
@@ -693,7 +694,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task<bool> ExistsAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             string bucketName,
             string destination,
             bool isFolder,
@@ -728,7 +729,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         private static async Task<bool> NameExistsAsync(
-            IAmazonS3 client,
+            AmazonS3Client client,
             string bucketName,
             string destination,
             bool isFolder,
@@ -747,7 +748,7 @@ namespace CloudflareR2Uploader.Services
 
         private static async Task CopyStreamAsync(
             Stream input,
-            Stream output,
+            FileStream output,
             string key,
             long totalBytes,
             IProgress<R2ObjectOperationProgress> progress,
@@ -757,9 +758,9 @@ namespace CloudflareR2Uploader.Services
             long copied = 0;
             while (true)
             {
-                int read = await input.ReadAsync(buffer, 0, buffer.Length, cancellationToken).ConfigureAwait(false);
+                int read = await input.ReadAsync(buffer.AsMemory(), cancellationToken).ConfigureAwait(false);
                 if (read == 0) break;
-                await output.WriteAsync(buffer, 0, read, cancellationToken).ConfigureAwait(false);
+                await output.WriteAsync(buffer.AsMemory(0, read), cancellationToken).ConfigureAwait(false);
                 copied += read;
                 Report(progress, "Downloading", 0, key, copied, totalBytes);
             }

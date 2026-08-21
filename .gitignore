@@ -1,4 +1,5 @@
 .vs/
+.worktrees/
 **/bin/
 **/obj/
 TestResults/
@@ -33,5 +34,29 @@ WebView2/
 Updates/
 *.download
 .wrangler/
+# Update signing keys belong outside the repository. These targeted patterns leave public
+# certificate examples such as .cer and non-key .pem files available for documentation.
+deploy/private/
+*.pfx
+*.p12
+*.key
+key.pem
+rsa-key.pem
+update-key.pem
+release-key.pem
+private.pem
+private-key.pem
+*-private.pem
+*-private-key.pem
+signing-key.pem
+private-signing-key.pem
+production-signing-key.pem
+update-signing-key.pem
+release-signing-key.pem
+manifest-signing-key.pem
+# Defensive ignores for explicitly exported signer results and interrupted publisher work.
+deploy/signed-manifest*.json
+deploy/signer-scratch/
+deploy/publisher-scratch/
 Build_Release.md
 Images/

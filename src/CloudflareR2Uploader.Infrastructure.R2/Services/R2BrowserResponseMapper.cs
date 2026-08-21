@@ -14,7 +14,7 @@ namespace CloudflareR2Uploader.Services
             string requestedPrefix,
             string requestedContinuationToken)
         {
-            if (response == null) throw new ArgumentNullException("response");
+            ArgumentNullException.ThrowIfNull(response);
 
             string prefix = R2BrowserPathUtility.NormalizePrefix(requestedPrefix);
             List<R2BrowserItem> items = new List<R2BrowserItem>();

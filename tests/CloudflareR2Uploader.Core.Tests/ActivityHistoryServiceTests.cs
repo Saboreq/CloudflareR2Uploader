@@ -192,11 +192,76 @@ namespace CloudflareR2Uploader.Tests
                 service.Cleared += (sender, args) => cleared = true;
 
                 await service.RecordAsync(Record(ActivityAction.Upload));
-                await service.ClearAsync();
+                Assert.IsTrue(await service.ClearAsync());
 
                 Assert.IsTrue(cleared);
                 Assert.AreEqual(0, (await service.QueryAsync(new ActivityQuery())).Count);
                 Assert.IsFalse(File.Exists(service.FilePath));
+            }
+        }
+
+        // Break caught: reporting a clear as successful when the delete failed makes the UI lie about retained history.
+        [TestMethod]
+        public async Task Clear_WhenDeleteFails_ReturnsFalseAndDoesNotRaiseCleared()
+        {
+            using (TemporaryDirectory directory = new TemporaryDirectory())
+            using (ActivityHistoryService service = new ActivityHistoryService(
+                null, directory.File("activity.jsonl"), AtomicFileWriter.Shared, new ThrowingFileDeleter()))
+            {
+                await service.RecordAsync(Record(ActivityAction.Upload));
+                bool raised = false;
+                service.Cleared += (sender, args) => raised = true;
+
+                bool result = await service.ClearAsync();
+
+                Assert.IsFalse(result);
+                Assert.IsFalse(raised);
+                Assert.IsTrue(File.Exists(service.FilePath));
+            }
+        }
+
+        // Break caught: a suppressed access/probe failure must not report a retained history file as cleared.
+        [TestMethod]
+        public async Task Clear_WhenAbsenceProbeFails_ReturnsFalseAndDoesNotRaiseCleared()
+        {
+            using (TemporaryDirectory directory = new TemporaryDirectory())
+            using (ActivityHistoryService service = new ActivityHistoryService(
+                null,
+                directory.File("activity.jsonl"),
+                AtomicFileWriter.Shared,
+                new FileSystemActivityHistoryFileDeleter(),
+                new ThrowingFileProbe()))
+            {
+                await service.RecordAsync(Record(ActivityAction.Upload));
+                bool raised = false;
+                service.Cleared += (sender, args) => raised = true;
+
+                bool result = await service.ClearAsync();
+
+                Assert.IsFalse(result);
+                Assert.IsFalse(raised);
+                Assert.IsFalse(File.Exists(service.FilePath));
+            }
+        }
+
+        // Break caught: a failed rewrite after pruning must leave the previously persisted JSON Lines bytes intact.
+        [TestMethod]
+        public async Task Prune_WhenAtomicReplacementFails_ReturnsZeroAndPreservesExistingBytes()
+        {
+            using (TemporaryDirectory directory = new TemporaryDirectory())
+            using (ActivityHistoryService service = new ActivityHistoryService(
+                null,
+                directory.File("activity.jsonl"),
+                new AtomicFileWriter(new ThrowingCommitter())))
+            {
+                await service.RecordAsync(Record(ActivityAction.Upload, timestampUtc: DateTime.UtcNow.AddDays(-31)));
+                await service.RecordAsync(Record(ActivityAction.Upload, timestampUtc: DateTime.UtcNow));
+                byte[] before = File.ReadAllBytes(service.FilePath);
+
+                Assert.AreEqual(0, await service.PruneAsync(30));
+
+                CollectionAssert.AreEqual(before, File.ReadAllBytes(service.FilePath));
+                Assert.AreEqual(0, Directory.GetFiles(directory.Path, "*.tmp").Length);
             }
         }
 
@@ -330,6 +395,22 @@ namespace CloudflareR2Uploader.Tests
             Assert.AreEqual(ActivityAction.Upload, record.Action);
             Assert.AreEqual(ActivityResult.Success, record.Result);
             Assert.IsFalse(record.IsStructurallyValid());
+        }
+
+        private sealed class ThrowingCommitter : IAtomicFileCommitter
+        {
+            public void Commit(string temporaryPath, string destinationPath) =>
+                throw new IOException("synthetic replacement failure");
+        }
+
+        private sealed class ThrowingFileDeleter : IActivityHistoryFileDeleter
+        {
+            public void Delete(string path) => throw new IOException("synthetic delete failure");
+        }
+
+        private sealed class ThrowingFileProbe : IActivityHistoryFileProbe
+        {
+            public void Probe(string path) => throw new UnauthorizedAccessException("synthetic probe failure");
         }
     }
 }

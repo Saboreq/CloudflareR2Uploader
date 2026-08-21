@@ -114,8 +114,8 @@ namespace CloudflareR2Uploader.Wpf.Converters
     }
 
     /// <summary>
-    /// Byte count to the same display text the WinForms build produced, so the two front ends
-    /// never disagree about a file's size.
+    /// Converts a byte count through the shared formatter so every WPF surface displays the
+    /// same file size.
     /// </summary>
     public sealed class FileSizeConverter : IValueConverter
     {

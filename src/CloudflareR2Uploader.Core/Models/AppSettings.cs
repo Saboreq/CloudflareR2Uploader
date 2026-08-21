@@ -24,7 +24,7 @@ namespace CloudflareR2Uploader.Models
 
         /// <summary>
         /// Schema written by this build. A file without <c>schemaVersion</c> was produced by
-        /// a build older than the WPF front end and is treated as version 1.
+        /// a pre-WPF release and is treated as version 1.
         /// </summary>
         public const int CurrentSchemaVersion = 2;
 
@@ -185,9 +185,8 @@ namespace CloudflareR2Uploader.Models
 
         // ------------------------------------------------------------------ schema 2 fields
         //
-        // Everything below was introduced with the WPF front end. The WinForms build shares
-        // this type, so it round-trips these members untouched and neither front end loses
-        // the other's preferences.
+        // Everything below was introduced with the WPF application. Older settings omit
+        // these members and receive deterministic values through SettingsMigrator.
 
         [DataMember(Name = "schemaVersion", Order = 27)]
         public int SchemaVersion { get; set; }

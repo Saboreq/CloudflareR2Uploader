@@ -1,17 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Contains files the legacy WinForms project compiles as links; see build\Modern.props. -->
-    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
-  </PropertyGroup>
-
-  <Import Project="..\..\build\Modern.props" />
-
-  <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>CloudflareR2Uploader</RootNamespace>
     <AssemblyName>CloudflareR2Uploader.Core</AssemblyName>
-    <Description>Domain models, application state, formatters and abstractions shared by every Cloudflare R2 Uploader front end.</Description>
+    <Description>Domain models, application state, formatters and abstractions for the Cloudflare R2 Uploader WPF application.</Description>
   </PropertyGroup>
 
   <ItemGroup>
@@ -20,6 +13,7 @@
     <InternalsVisibleTo Include="CloudflareR2Uploader.Infrastructure.Tests" />
     <InternalsVisibleTo Include="CloudflareR2Uploader.Platform.Windows" />
     <InternalsVisibleTo Include="CloudflareR2Uploader.Platform.Tests" />
+    <InternalsVisibleTo Include="CloudflareR2Uploader.UpdateSigner" />
     <InternalsVisibleTo Include="CloudflareR2Uploader.Wpf" />
     <InternalsVisibleTo Include="CloudflareR2Uploader.Wpf.Tests" />
   </ItemGroup>

@@ -11,8 +11,8 @@ namespace CloudflareR2Uploader.Utilities
     public static class PathUtility
     {
         /// <summary>
-        /// .NET Framework 4.8 with <c>longPathAware</c> handles most long paths, but the
-        /// extended-length prefix is still the reliable way to open very long paths.
+        /// Windows long-path awareness handles most paths, but the extended-length prefix is
+        /// still the reliable way to open very long paths through platform APIs.
         /// </summary>
         public static string ToExtendedLengthPath(string path)
         {
@@ -21,7 +21,7 @@ namespace CloudflareR2Uploader.Utilities
             if (path.Length < 248) return path;
 
             if (path.StartsWith(@"\\", StringComparison.Ordinal))
-                return @"\\?\UNC\" + path.Substring(2);
+                return string.Concat(@"\\?\UNC\", path.AsSpan(2));
 
             // Only rooted paths can be prefixed.
             if (path.Length >= 3 && path[1] == ':' && (path[2] == '\\' || path[2] == '/'))

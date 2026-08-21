@@ -11,6 +11,8 @@ namespace CloudflareR2Uploader.Tests
     [TestClass]
     public sealed class ActivityCsvExporterTests
     {
+        private static readonly string[] CrlfSeparator = { "\r\n" };
+
         [TestMethod]
         public void EscapeField_LeavesOrdinaryValuesAlone()
         {
@@ -63,7 +65,7 @@ namespace CloudflareR2Uploader.Tests
             };
 
             string csv = ActivityCsvExporter.Export(records);
-            string[] lines = csv.Split(new[] { "\r\n" }, StringSplitOptions.RemoveEmptyEntries);
+            string[] lines = csv.Split(CrlfSeparator, StringSplitOptions.RemoveEmptyEntries);
 
             Assert.AreEqual(2, lines.Length);
             StringAssert.StartsWith(lines[0], "Timestamp (UTC),Action,Result,Object,Destination,Bucket");

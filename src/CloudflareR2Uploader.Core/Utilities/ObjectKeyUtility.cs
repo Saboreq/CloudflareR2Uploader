@@ -89,17 +89,17 @@ namespace CloudflareR2Uploader.Utilities
                 reason = "The object key must not start with '/'.";
                 return false;
             }
-            if (key.EndsWith("/", StringComparison.Ordinal))
+            if (key.EndsWith('/'))
             {
                 reason = "The object key must not end with '/'.";
                 return false;
             }
-            if (key.IndexOf("//", StringComparison.Ordinal) >= 0)
+            if (key.Contains("//", StringComparison.Ordinal))
             {
                 reason = "The object key must not contain an empty path segment ('//').";
                 return false;
             }
-            if (key.IndexOf('\\') >= 0)
+            if (key.Contains('\\'))
             {
                 reason = "The object key must use '/' as its separator, not '\\'.";
                 return false;
@@ -135,8 +135,8 @@ namespace CloudflareR2Uploader.Utilities
         /// </summary>
         public static string AppendDuplicateSuffix(string key, int index)
         {
-            if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key must not be empty.", "key");
-            if (index < 1) throw new ArgumentOutOfRangeException("index", "Duplicate index starts at 1.");
+            if (string.IsNullOrEmpty(key)) throw new ArgumentException("Key must not be empty.", nameof(key));
+            if (index < 1) throw new ArgumentOutOfRangeException(nameof(index), "Duplicate index starts at 1.");
 
             int lastSlash = key.LastIndexOf('/');
             string directory = lastSlash >= 0 ? key.Substring(0, lastSlash + 1) : string.Empty;

@@ -27,8 +27,8 @@ namespace CloudflareR2Uploader.Services
             string continuationToken,
             CancellationToken cancellationToken)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
-            if (credentials == null) throw new ArgumentNullException("credentials");
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(credentials);
 
             string normalizedPrefix = R2BrowserPathUtility.NormalizePrefix(prefix);
             AmazonS3Client client = null;

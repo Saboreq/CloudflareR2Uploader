@@ -15,7 +15,7 @@ Cloudflare R2 Uploader is a Windows desktop client for uploading, browsing, prev
 - Preflighted bulk downloads and permanent bulk deletion for mixed file/folder selections, including overlap deduplication and cancellation.
 - Public URL copying, temporary SigV4 download links, rich local Preview, and complete Properties metadata.
 - Tray-owned background lifetime, close/minimize-to-tray, per-user Start with Windows, and single-instance activation.
-- Per-user installer and consent-based HTTPS updates verified by exact size and SHA-256.
+- Per-user installer and consent-based HTTPS updates authenticated with RSA-PSS/SHA-256, then verified by exact size and SHA-256.
 
 ## Supported Windows and requirements
 
@@ -88,7 +88,7 @@ A per-user named mutex and pipe ensure a second launch activates the existing wi
 
 ## Updates
 
-Installer builds can contain a publisher-configured HTTPS manifest URL. When automatic checks are enabled, the app checks once after startup and shows a notification when a higher SemVer release exists. The Updates settings page shows the version, size, and release notes. **Download and install** retrieves the setup EXE, verifies the manifest-declared byte length and SHA-256, asks for final consent, preserves or discards active multipart state according to the user's choice, then runs the installer and restarts the app.
+Installer builds can contain a publisher-configured HTTPS manifest URL and trusted RSA public key. The application rejects unsigned, malformed, altered, or wrong-key manifests before comparing versions or starting an installer request. When automatic checks are enabled, the app checks once after startup and shows a notification when a higher SemVer release exists. The Updates settings page shows the version, size, and release notes. **Download and install** retrieves the setup EXE, re-authenticates the manifest, verifies the declared byte length and SHA-256, asks for final consent, preserves or discards active multipart state according to the user's choice, then reopens and verifies the exact installer while denying replacement through process launch before restarting the app.
 
 Updates are never installed silently. Automatic checks can be disabled in Settings, and **Check for updates...** is available from the tray menu. See [deploy/README.md](deploy/README.md) for the dedicated Cloudflare R2 bucket, custom-domain, immutable installer, and manifest-last publishing setup.
 
@@ -108,33 +108,42 @@ Preview cache content can contain private object data. Protect the Windows accou
 
 ## Build, test, and package locally
 
-Install the .NET 10 SDK with Windows desktop targeting plus Inno Setup 6 or 7. `CloudflareR2Uploader.Wpf.sln` is the SDK-style production solution; the older `CloudflareR2Uploader.sln` remains only as a compatibility gate while the migration is reviewed. Pass a nonstandard compiler location with `-InnoSetupCompiler <path-to-ISCC.exe>`.
+Install the .NET 10 SDK with Windows desktop targeting. Use Visual Studio 2026 (18.0+) with the .NET desktop development workload, or the .NET 10 CLI with an editor such as VS Code. The release/package path additionally requires PowerShell 7+ and the official Inno Setup 6.7.1 installation. `CloudflareR2Uploader.sln` is the only supported solution and all projects are SDK-style. If Inno Setup was installed in a custom directory, pass its registered compiler with `-InnoSetupCompiler <path-to-ISCC.exe>`; the path must match the official 6.7.1 uninstall registration and is validated before build or package child processes start.
 
-Run the modern build and tests directly with:
+Run the build and tests directly with:
 
 ```powershell
-dotnet restore .\CloudflareR2Uploader.Wpf.sln
-dotnet build .\CloudflareR2Uploader.Wpf.sln -c Debug --no-restore
-dotnet test .\CloudflareR2Uploader.Wpf.sln -c Debug --no-build
+dotnet restore .\CloudflareR2Uploader.sln
+dotnet build .\CloudflareR2Uploader.sln -c Debug --no-restore
+dotnet test .\CloudflareR2Uploader.sln -c Debug --no-build
 ```
 
-Run the full restore, Release build, modern MSTest suite, framework-dependent x64 WPF publish, payload validation, and single-EXE installer build:
+The supported repository layout is:
+
+- `src/CloudflareR2Uploader.Core`: models, persistence, formatters, and application contracts.
+- `src/CloudflareR2Uploader.Infrastructure.R2`: Cloudflare R2/S3 operations and transfer services.
+- `src/CloudflareR2Uploader.Platform.Windows`: DPAPI, startup, single-instance, theme, and update integration.
+- `src/CloudflareR2Uploader.Wpf`: the only desktop frontend.
+- `tools/CloudflareR2Uploader.UpdateSigner`: the shared signed-manifest publisher/verifier CLI.
+- `tests/`: the five .NET 10 MSTest projects plus the PowerShell 7 release-security harness.
+
+Run the complete restore, Release build, MSTest suite, framework-dependent x64 WPF publish, payload validation, and single-EXE installer build through `build/Build-Release.ps1`:
 
 ```powershell
 .\build\Build-Release.ps1 -Version 1.2.3
 ```
 
-Options include `-SkipTests`, `-Configuration Debug|Release`, `-OutputDirectory <path>`, `-KeepStaging`, `-UpdateBaseUrl <https-url>`, `-UpdatePrefix <path>`, and `-InnoSetupCompiler <path>`. Test results are written as TRX under `TestResults`. The only release file is the Inno installer `CloudflareR2Uploader-v<VERSION>-Setup.exe`.
+Options include `-SkipTests`, `-Configuration Debug|Release`, `-OutputDirectory <path>`, `-KeepStaging`, `-UpdateBaseUrl <https-url>`, `-UpdateManifestPublicKey <base64-spki>`, `-UpdatePrefix <path>`, and `-InnoSetupCompiler <path>`. The update URL and public key must be supplied together. Test results are written as TRX under `TestResults`. The only release file is the Inno installer `CloudflareR2Uploader-v<VERSION>-Setup.exe`.
 
 For an update-enabled production build, use the same public base URL and prefix that will be published to R2:
 
 ```powershell
-.\build\Build-Release.ps1 -Version 1.2.3 -UpdateBaseUrl https://downloads.example.com
+.\build\Build-Release.ps1 -Version 1.2.3 -UpdateBaseUrl https://downloads.example.com -UpdateManifestPublicKey <base64-spki>
 ```
 
 ## GitHub automation and publishing
 
-`.github/workflows/ci.yml` runs the complete Windows build/test/package path for main pushes, pull requests, and manual runs without R2 credentials. `.github/workflows/release.yml` validates tags, runs the same gates, preserves prerelease informational versions, and creates a GitHub Release using only the repository-provided token.
+`.github/workflows/ci.yml` runs the complete Windows build/test/package path and the PowerShell release-security harness for main pushes, pull requests, and manual runs without R2 credentials. `.github/workflows/release.yml` validates tags, requires the paired `UPDATE_BASE_URL` and `UPDATE_MANIFEST_PUBLIC_KEY` repository variables, runs the same gates, preserves prerelease informational versions, and creates a GitHub Release using only the repository-provided token.
 
 Publish a reviewed release with:
 
@@ -151,12 +160,12 @@ See [docs/RELEASING.md](docs/RELEASING.md) for release verification and failure 
 - **PDF preview unavailable:** install WebView2 Evergreen Runtime; other app features continue working.
 - **Access denied:** add Object Read and/or Object Write permission required by the attempted operation.
 - **Startup path stale:** open Settings and save with Start with Windows enabled.
-- **Updates not configured:** build with `-UpdateBaseUrl`, or use the Cloudflare publisher script so setup embeds the manifest location.
+- **Updates not configured:** build with both `-UpdateBaseUrl` and `-UpdateManifestPublicKey`, or use the Cloudflare publisher script so setup embeds the authenticated update source.
 - Filters and sorting affect only the current server page. There is no drive mounting, WebDAV, Trash, version browser, or server-side full-bucket search.
 - Live R2 behavior depends on the user's endpoint, credentials, permissions, object sizes, and network. CI uses no real credentials and performs no Cloudflare integration calls.
 
-## Contributing, security, components, and license status
+## Contributing, security, components, and license
 
-Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing the application or compatibility projects. Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Direct dependencies and licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
+Read [CONTRIBUTING.md](CONTRIBUTING.md) before changing the application. Report vulnerabilities as described in [SECURITY.md](SECURITY.md). Direct dependencies and licenses are listed in [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
-This repository currently contains no application `LICENSE` file, so no application license is asserted here. Third-party components retain their own licenses.
+Cloudflare R2 Uploader is licensed under the [MIT License](LICENSE), copyright (c) 2026 Saboreq. Third-party components retain their own licenses.

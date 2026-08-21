@@ -118,7 +118,7 @@ namespace CloudflareR2Uploader.Wpf
             services.AddSingleton<R2PresignedUrlService>();
             services.AddSingleton<R2PreviewService>();
             services.AddSingleton<R2ObjectDetailsService>();
-            services.AddSingleton<UploadQueueService>();
+            AddUploadQueueServices(services);
             services.AddSingleton<UpdateService>();
 
             services.AddSingleton<IClipboardService, WpfClipboardService>();
@@ -155,6 +155,13 @@ namespace CloudflareR2Uploader.Wpf
                 ValidateScopes = true,
                 ValidateOnBuild = true
             });
+        }
+
+        internal static void AddUploadQueueServices(IServiceCollection services)
+        {
+            services.AddSingleton<UploadQueueService>();
+            services.AddSingleton<IUploadQueueLifecycle>(provider =>
+                provider.GetRequiredService<UploadQueueService>());
         }
 
         private void OnDispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

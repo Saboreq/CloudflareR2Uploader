@@ -42,7 +42,7 @@ namespace CloudflareR2Uploader.Services
         /// </summary>
         public static ActivityRecord Sanitize(ActivityRecord record)
         {
-            if (record is null) throw new ArgumentNullException(nameof(record));
+            ArgumentNullException.ThrowIfNull(record);
 
             return new ActivityRecord
             {

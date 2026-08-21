@@ -37,13 +37,35 @@ namespace CloudflareR2Uploader.Services
         private readonly ILoggingService? _log;
         private readonly string _filePath;
         private readonly SemaphoreSlim _gate = new SemaphoreSlim(1, 1);
+        private readonly IAtomicFileWriter _atomicFiles;
+        private readonly IActivityHistoryFileDeleter _fileDeleter;
+        private readonly IActivityHistoryFileProbe _fileProbe;
 
         private bool _disposed;
 
         public ActivityHistoryService(ILoggingService? log = null, string? filePath = null)
+            : this(
+                log,
+                filePath,
+                AtomicFileWriter.Shared,
+                new FileSystemActivityHistoryFileDeleter(),
+                new FileSystemActivityHistoryFileProbe())
+        {
+        }
+
+        internal ActivityHistoryService(
+            ILoggingService? log,
+            string? filePath,
+            IAtomicFileWriter atomicFiles,
+            IActivityHistoryFileDeleter? fileDeleter = null,
+            IActivityHistoryFileProbe? fileProbe = null)
         {
             _log = log;
             _filePath = string.IsNullOrEmpty(filePath) ? AppPaths.ActivityHistoryFilePath : filePath!;
+            ArgumentNullException.ThrowIfNull(atomicFiles);
+            _atomicFiles = atomicFiles;
+            _fileDeleter = fileDeleter ?? new FileSystemActivityHistoryFileDeleter();
+            _fileProbe = fileProbe ?? new FileSystemActivityHistoryFileProbe();
         }
 
         public event EventHandler<ActivityRecordedEventArgs>? Recorded;
@@ -53,7 +75,7 @@ namespace CloudflareR2Uploader.Services
 
         public async Task RecordAsync(ActivityRecord record, CancellationToken cancellationToken = default)
         {
-            if (record is null) throw new ArgumentNullException(nameof(record));
+            ArgumentNullException.ThrowIfNull(record);
             if (_disposed) return;
 
             ActivityRecord safe = ActivitySanitizer.Sanitize(record);
@@ -124,17 +146,26 @@ namespace CloudflareR2Uploader.Services
             return summary;
         }
 
-        public async Task ClearAsync(CancellationToken cancellationToken = default)
+        public async Task<bool> ClearAsync(CancellationToken cancellationToken = default)
         {
             await _gate.WaitAsync(cancellationToken).ConfigureAwait(false);
             try
             {
-                if (File.Exists(_filePath)) File.Delete(_filePath);
+                _fileDeleter.Delete(_filePath);
+                if (!IsFileAbsent())
+                {
+                    _log?.Error(
+                        "Activity.Clear",
+                        "The activity history could not be cleared.",
+                        new IOException("The activity history file is still present after deletion."));
+                    return false;
+                }
                 _log?.Info("Activity.Clear", "The activity history was cleared by the user.");
             }
             catch (Exception ex) when (IsRecoverable(ex))
             {
                 _log?.Error("Activity.Clear", "The activity history could not be cleared.", ex);
+                return false;
             }
             finally
             {
@@ -142,6 +173,7 @@ namespace CloudflareR2Uploader.Services
             }
 
             Cleared?.Invoke(this, EventArgs.Empty);
+            return true;
         }
 
         public async Task<int> PruneAsync(int retentionDays, CancellationToken cancellationToken = default)
@@ -282,7 +314,7 @@ namespace CloudflareR2Uploader.Services
 
         private static bool Contains(string? value, string needle)
         {
-            return (value ?? string.Empty).IndexOf(needle, StringComparison.CurrentCultureIgnoreCase) >= 0;
+            return (value ?? string.Empty).Contains(needle, StringComparison.CurrentCultureIgnoreCase);
         }
 
         // --------------------------------------------------------------------------- writing
@@ -342,18 +374,13 @@ namespace CloudflareR2Uploader.Services
             records.Sort(static (left, right) => left.TimestampUtc.CompareTo(right.TimestampUtc));
 
             AppPaths.EnsureDirectory(Path.GetDirectoryName(_filePath));
-            string temporary = _filePath + ".tmp";
-
-            using (FileStream stream = new FileStream(temporary, FileMode.Create, FileAccess.Write, FileShare.None))
-            using (StreamWriter writer = new StreamWriter(stream, new UTF8Encoding(false)))
+            _atomicFiles.Write(_filePath, stream =>
             {
-                foreach (ActivityRecord record in records) writer.WriteLine(Serialize(record));
-                writer.Flush();
-                stream.Flush(true);
-            }
-
-            if (File.Exists(_filePath)) File.Delete(_filePath);
-            File.Move(temporary, _filePath);
+                using (StreamWriter writer = new StreamWriter(stream, new UTF8Encoding(false), 1024, leaveOpen: true))
+                {
+                    foreach (ActivityRecord record in records) writer.WriteLine(Serialize(record));
+                }
+            });
         }
 
         // --------------------------------------------------------------------- serialisation
@@ -397,11 +424,53 @@ namespace CloudflareR2Uploader.Services
                 || ex is ArgumentException;
         }
 
+        private bool IsFileAbsent()
+        {
+            try
+            {
+                _fileProbe.Probe(_filePath);
+                return false;
+            }
+            catch (FileNotFoundException)
+            {
+                return true;
+            }
+            catch (DirectoryNotFoundException)
+            {
+                return true;
+            }
+        }
+
         public void Dispose()
         {
             if (_disposed) return;
             _disposed = true;
             _gate.Dispose();
+        }
+    }
+
+    internal interface IActivityHistoryFileDeleter
+    {
+        void Delete(string path);
+    }
+
+    internal sealed class FileSystemActivityHistoryFileDeleter : IActivityHistoryFileDeleter
+    {
+        public void Delete(string path) => File.Delete(path);
+    }
+
+    internal interface IActivityHistoryFileProbe
+    {
+        void Probe(string path);
+    }
+
+    internal sealed class FileSystemActivityHistoryFileProbe : IActivityHistoryFileProbe
+    {
+        public void Probe(string path)
+        {
+            using (FileStream stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+            {
+            }
         }
     }
 }

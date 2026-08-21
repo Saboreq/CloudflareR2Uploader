@@ -22,9 +22,8 @@ namespace CloudflareR2Uploader.Wpf.ViewModels.Upload
     /// <summary>
     /// The Upload screen, implementing Images/04-upload-queue.png.
     /// <para>
-    /// Owns no transfer logic: the shared <see cref="UploadQueueService"/> runs the queue
-    /// exactly as it does for the WinForms front end, including multipart resume, the pause
-    /// gate, retry policy and overwrite prompts. This class projects that state onto the
+    /// Owns no transfer logic: <see cref="UploadQueueService"/> runs multipart resume, the
+    /// pause gate, retry policy and overwrite prompts. This class projects that state onto the
     /// design and translates the toolbar into service calls.
     /// </para>
     /// </summary>
@@ -106,7 +105,7 @@ namespace CloudflareR2Uploader.Wpf.ViewModels.Upload
         [ObservableProperty]
         private string _destinationPrefix = string.Empty;
 
-        /// <summary>Only honoured when exactly one file is queued, matching the WinForms rule.</summary>
+        /// <summary>Only honoured when exactly one file is queued.</summary>
         [ObservableProperty]
         private string _objectName = string.Empty;
 

@@ -293,10 +293,10 @@ namespace CloudflareR2Uploader.Wpf.Tests
                 ActivityQuery query, CancellationToken cancellationToken = default) =>
                 Task.FromResult(new ActivitySummary());
 
-            public Task ClearAsync(CancellationToken cancellationToken = default)
+            public Task<bool> ClearAsync(CancellationToken cancellationToken = default)
             {
                 Cleared?.Invoke(this, EventArgs.Empty);
-                return Task.CompletedTask;
+                return Task.FromResult(true);
             }
 
             public Task<int> PruneAsync(int retentionDays, CancellationToken cancellationToken = default) =>

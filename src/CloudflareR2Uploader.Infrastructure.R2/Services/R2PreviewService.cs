@@ -22,7 +22,7 @@ namespace CloudflareR2Uploader.Services
         public const long PdfLimitBytes = 25L * 1024L * 1024L;
         private readonly PreviewCacheService _cache;
 
-        public R2PreviewService(PreviewCacheService cache) { _cache = cache ?? throw new ArgumentNullException("cache"); }
+        public R2PreviewService(PreviewCacheService cache) { _cache = cache ?? throw new ArgumentNullException(nameof(cache)); }
 
         public async Task<R2PreviewResult> GetAsync(AppSettings settings, R2Credentials credentials, R2BrowserItem item, string contentType, CancellationToken cancellationToken)
         {
@@ -68,7 +68,7 @@ namespace CloudflareR2Uploader.Services
         internal static R2PreviewResult FormatText(R2PreviewKind kind, byte[] bytes, bool truncated)
         {
             if (IsProbablyBinary(bytes)) return new R2PreviewResult { Kind = R2PreviewKind.Unsupported, Warning = "The object appears to contain binary data." };
-            string text = Decode(bytes ?? new byte[0]);
+            string text = Decode(bytes ?? Array.Empty<byte>());
             string warning = null;
             if (kind == R2PreviewKind.Json)
             {
@@ -153,10 +153,10 @@ namespace CloudflareR2Uploader.Services
                 int height;
                 if (ImageDimensionReader.TryRead(path, out width, out height)) { result.PixelWidth = width; result.PixelHeight = height; }
                 IReadOnlyList<MetadataExtractor.Directory> directories = ImageMetadataReader.ReadMetadata(path);
-                MetadataExtractor.Directory camera = directories.FirstOrDefault(value => value.Name.IndexOf("Exif", StringComparison.OrdinalIgnoreCase) >= 0);
+                MetadataExtractor.Directory camera = directories.FirstOrDefault(value => value.Name.Contains("Exif", StringComparison.OrdinalIgnoreCase));
                 if (camera != null)
                 {
-                    string make = camera.Tags.Where(value => value.Name.IndexOf("Make", StringComparison.OrdinalIgnoreCase) >= 0).Select(value => value.Description).FirstOrDefault();
+                    string make = camera.Tags.Where(value => value.Name.Contains("Make", StringComparison.OrdinalIgnoreCase)).Select(value => value.Description).FirstOrDefault();
                     if (!string.IsNullOrWhiteSpace(make)) result.Warning = "Camera: " + make;
                 }
             }

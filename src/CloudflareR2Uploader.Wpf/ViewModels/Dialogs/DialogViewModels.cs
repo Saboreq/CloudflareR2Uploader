@@ -171,8 +171,8 @@ namespace CloudflareR2Uploader.Wpf.ViewModels.Dialogs
     }
 
     /// <summary>
-    /// Asks what to do about an existing object key, preserving the four choices the
-    /// WinForms build offered: overwrite, skip, upload under a new name, or cancel the run.
+    /// Asks what to do about an existing object key: overwrite, skip, upload under a new
+    /// name, or cancel the run.
     /// </summary>
     public sealed partial class OverwritePromptViewModel : ObservableObject, IDialogCloseRequester
     {

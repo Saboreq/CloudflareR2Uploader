@@ -36,7 +36,7 @@ namespace CloudflareR2Uploader.Models
 
         public UploadQueueItem(string localFilePath, string relativePath, long fileSize, DateTime lastWriteUtc)
         {
-            if (string.IsNullOrEmpty(localFilePath)) throw new ArgumentException("Local file path is required.", "localFilePath");
+            if (string.IsNullOrEmpty(localFilePath)) throw new ArgumentException("Local file path is required.", nameof(localFilePath));
 
             Id = Guid.NewGuid();
             LocalFilePath = localFilePath;

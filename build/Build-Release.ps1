@@ -6,6 +6,8 @@ param(
     [string]$Version = '1.0.0-dev',
     [string]$OutputDirectory = 'dist',
     [string]$UpdateBaseUrl = $env:CLOUDFLARE_R2_UPDATER_BASE_URL,
+    [string]$UpdateManifestPublicKey = $env:CLOUDFLARE_R2_UPDATER_MANIFEST_PUBLIC_KEY,
+    [switch]$RequireSignedUpdate,
     [string]$UpdatePrefix = 'cloudflare-r2-uploader',
     [string]$InnoSetupCompiler = $env:INNO_SETUP_COMPILER,
     [switch]$KeepStaging
@@ -13,9 +15,10 @@ param(
 
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version 2.0
+. (Join-Path $PSScriptRoot 'InnoSetupRegistration.ps1')
 
 $repositoryRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..'))
-$solutionPath = Join-Path $repositoryRoot 'CloudflareR2Uploader.Wpf.sln'
+$solutionPath = Join-Path $repositoryRoot 'CloudflareR2Uploader.sln'
 $applicationProject = Join-Path $repositoryRoot 'src\CloudflareR2Uploader.Wpf\CloudflareR2Uploader.Wpf.csproj'
 $testResults = Join-Path $repositoryRoot 'TestResults'
 $resolvedOutput = if ([System.IO.Path]::IsPathRooted($OutputDirectory)) { [System.IO.Path]::GetFullPath($OutputDirectory) } else { [System.IO.Path]::GetFullPath((Join-Path $repositoryRoot $OutputDirectory)) }
@@ -31,27 +34,64 @@ $iconGenerator = Join-Path $PSScriptRoot 'Generate-BrandIcon.ps1'
 # that a clean build is expected to delete wholesale.
 $readmeImageRelative = 'docs\images\cloudflare-r2-uploader.png'
 
-if ($Version -notmatch '^(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-(?:[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$') {
+$publishableSemanticVersionPattern = '^(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?(?![\s\S])'
+if ($Version.Length -gt 128 -or $Version -notmatch $publishableSemanticVersionPattern) {
     throw "Version '$Version' is not supported. Use SemVer such as 1.2.3 or 1.2.3-beta.1."
 }
-$numericVersion = '{0}.{1}.{2}.0' -f $Matches.major, $Matches.minor, $Matches.patch
+$versionMajor = [uint16]0
+$versionMinor = [uint16]0
+$versionPatch = [uint16]0
+if (-not [uint16]::TryParse($Matches.major, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionMajor) -or
+    -not [uint16]::TryParse($Matches.minor, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionMinor) -or
+    -not [uint16]::TryParse($Matches.patch, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionPatch)) {
+    throw "Version '$Version' cannot be represented by Windows file-version metadata."
+}
+$numericVersion = '{0}.{1}.{2}.0' -f $versionMajor, $versionMinor, $versionPatch
 
-if (-not [string]::IsNullOrWhiteSpace($UpdateBaseUrl)) {
+$hasUpdateUrl = -not [string]::IsNullOrWhiteSpace($UpdateBaseUrl)
+$hasUpdateKey = -not [string]::IsNullOrWhiteSpace($UpdateManifestPublicKey)
+if ($RequireSignedUpdate -and -not ($hasUpdateUrl -and $hasUpdateKey)) {
+    throw 'A signed update URL and public key are required for this release build.'
+}
+if ($hasUpdateUrl -ne $hasUpdateKey) {
+    throw 'UpdateBaseUrl and UpdateManifestPublicKey must be supplied together.'
+}
+
+if ($hasUpdateUrl) {
     $parsedUpdateBase = $null
-    if (-not [Uri]::TryCreate($UpdateBaseUrl.Trim(), [UriKind]::Absolute, [ref]$parsedUpdateBase) -or $parsedUpdateBase.Scheme -ne 'https' -or -not [string]::IsNullOrEmpty($parsedUpdateBase.UserInfo)) {
-        throw 'UpdateBaseUrl must be an absolute HTTPS URL without embedded credentials.'
+    if (-not [Uri]::TryCreate($UpdateBaseUrl.Trim(), [UriKind]::Absolute, [ref]$parsedUpdateBase) -or $parsedUpdateBase.Scheme -ne 'https' -or -not [string]::IsNullOrEmpty($parsedUpdateBase.UserInfo) -or -not [string]::IsNullOrEmpty($parsedUpdateBase.Query) -or -not [string]::IsNullOrEmpty($parsedUpdateBase.Fragment)) {
+        throw 'UpdateBaseUrl must be an absolute HTTPS URL without embedded credentials, a query, or a fragment.'
     }
     $UpdateBaseUrl = $parsedUpdateBase.AbsoluteUri.TrimEnd('/')
 }
 if ($UpdatePrefix -notmatch '^[0-9A-Za-z][0-9A-Za-z._/-]*$' -or $UpdatePrefix.Contains('..')) { throw 'UpdatePrefix contains unsupported path characters.' }
 $UpdatePrefix = $UpdatePrefix.Trim('/')
 
+$requiredInnoSetupVersion = '6.7.1'
+$InnoSetupCompiler = Resolve-InnoSetupCompilerRegistration `
+    -RequestedCompiler $InnoSetupCompiler `
+    -RequiredVersion $requiredInnoSetupVersion
+
 $dotnet = Get-Command dotnet -ErrorAction Stop
+
+if ($hasUpdateUrl) {
+    $signerProject = Join-Path $repositoryRoot 'tools\CloudflareR2Uploader.UpdateSigner\CloudflareR2Uploader.UpdateSigner.csproj'
+    $signerAssembly = Join-Path $repositoryRoot 'tools\CloudflareR2Uploader.UpdateSigner\bin\Release\net10.0\CloudflareR2Uploader.UpdateSigner.dll'
+    & $dotnet.Source build $signerProject -c Release --nologo -v:minimal
+    if ($LASTEXITCODE -ne 0 -or -not (Test-Path -LiteralPath $signerAssembly -PathType Leaf)) {
+        throw 'The update public-key validator could not be built.'
+    }
+    $keyValidationOutput = & $dotnet.Source $signerAssembly 'validate-public-key' '--public-key' $UpdateManifestPublicKey 2>&1
+    if ($LASTEXITCODE -ne 0) {
+        throw 'UpdateManifestPublicKey must be a canonical RSA SubjectPublicKeyInfo of at least 2048 bits.'
+    }
+}
 
 # Every repository file the package needs is checked before anything is built, so a missing
 # input fails in a second with an actionable message instead of surfacing as a raw
 # Copy-Item error several minutes into the run.
 $requiredInputs = @(
+    'LICENSE',
     'README.md',
     'THIRD-PARTY-NOTICES.md',
     'installer\CloudflareR2Uploader.iss',
@@ -63,22 +103,6 @@ if ($missingInputs.Count -gt 0) {
         ($missingInputs -join ', ') +
         ". Restore them (git checkout -- <path>) and run this script again.")
 }
-
-if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler)) {
-    $innoCandidates = @(
-        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 7\ISCC.exe'),
-        (Join-Path $env:ProgramFiles 'Inno Setup 7\ISCC.exe'),
-        (Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'),
-        (Join-Path $env:ProgramFiles 'Inno Setup 6\ISCC.exe'),
-        (Join-Path $env:LOCALAPPDATA 'Programs\Inno Setup 7\ISCC.exe'),
-        (Join-Path $repositoryRoot 'artifacts\tools\inno-7\ISCC.exe')
-    )
-    $InnoSetupCompiler = $innoCandidates | Where-Object { Test-Path -LiteralPath $_ -PathType Leaf } | Select-Object -First 1
-}
-if ([string]::IsNullOrWhiteSpace($InnoSetupCompiler) -or -not (Test-Path -LiteralPath $InnoSetupCompiler -PathType Leaf)) {
-    throw 'Inno Setup 6 or 7 compiler was not found. Install JRSoftware.InnoSetup.7 or pass -InnoSetupCompiler <path-to-ISCC.exe>.'
-}
-$InnoSetupCompiler = [System.IO.Path]::GetFullPath($InnoSetupCompiler)
 
 try {
     & $iconGenerator
@@ -101,21 +125,22 @@ try {
     Get-ChildItem -LiteralPath $stagingDirectory -Recurse -Filter '*.pdb' | Remove-Item -Force
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'README.md') -Destination $stagingDirectory
     Copy-Item -LiteralPath (Join-Path $repositoryRoot 'THIRD-PARTY-NOTICES.md') -Destination $stagingDirectory
+    Copy-Item -LiteralPath (Join-Path $repositoryRoot 'LICENSE') -Destination $stagingDirectory
     # The image keeps its repository-relative path inside the payload so the README's own
     # link still resolves when it is read from the install directory.
     $packageImage = Join-Path $stagingDirectory $readmeImageRelative
     New-Item -ItemType Directory -Path (Split-Path -Parent $packageImage) -Force | Out-Null
     Copy-Item -LiteralPath (Join-Path $repositoryRoot $readmeImageRelative) -Destination $packageImage
-    $licensePath = Join-Path $repositoryRoot 'LICENSE'
-    if (Test-Path -LiteralPath $licensePath -PathType Leaf) { Copy-Item -LiteralPath $licensePath -Destination $stagingDirectory }
-
-    if (-not [string]::IsNullOrWhiteSpace($UpdateBaseUrl)) {
+    if ($hasUpdateUrl) {
         $manifestUrl = $UpdateBaseUrl + '/' + $UpdatePrefix + '/manifest.json'
-        $source = [ordered]@{ manifestUrl = $manifestUrl } | ConvertTo-Json
+        $source = [ordered]@{
+            manifestUrl = $manifestUrl
+            manifestPublicKey = $UpdateManifestPublicKey
+        } | ConvertTo-Json
         [System.IO.File]::WriteAllText((Join-Path $stagingDirectory 'update-source.json'), $source + "`r`n", [System.Text.UTF8Encoding]::new($false))
         Write-Host "Update channel: $manifestUrl"
     } else {
-        Write-Warning 'No UpdateBaseUrl was supplied. The installer is update-compatible, but this build will not perform automatic checks.'
+        Write-Warning 'No update URL/public-key pair was supplied. This build will not perform automatic checks.'
     }
 
     $expected = @(
@@ -123,6 +148,7 @@ try {
         'CloudflareR2Uploader.dll',
         'CloudflareR2Uploader.deps.json',
         'CloudflareR2Uploader.runtimeconfig.json',
+        'LICENSE',
         'README.md',
         'THIRD-PARTY-NOTICES.md',
         $readmeImageRelative,
@@ -156,7 +182,9 @@ try {
     if ($null -eq $installerIcon) { throw 'Windows could not extract the embedded installer icon.' }
     $installerIcon.Dispose()
     $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($installerPath)
-    if ($versionInfo.ProductName.Trim() -ne 'Cloudflare R2 Uploader' -or $versionInfo.FileDescription.Trim() -ne 'Cloudflare R2 Uploader Setup') {
+    if ($versionInfo.ProductName.Trim() -ne 'Cloudflare R2 Uploader' -or
+        $versionInfo.FileDescription.Trim() -ne 'Cloudflare R2 Uploader Setup' -or
+        $versionInfo.FileVersion -ne $numericVersion) {
         throw 'The generated EXE does not contain the expected Inno Setup release metadata.'
     }
 

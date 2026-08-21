@@ -24,11 +24,19 @@ namespace CloudflareR2Uploader.Services
         private readonly ILoggingService _log;
         private readonly string _directory;
         private readonly object _sync = new object();
+        private readonly IAtomicFileWriter _atomicFiles;
 
         public UploadStateStore(ILoggingService log, string directory = null)
+            : this(log, directory, AtomicFileWriter.Shared)
+        {
+        }
+
+        internal UploadStateStore(ILoggingService log, string directory, IAtomicFileWriter atomicFiles)
         {
             _log = log;
             _directory = string.IsNullOrEmpty(directory) ? AppPaths.UploadStateDirectory : directory;
+            ArgumentNullException.ThrowIfNull(atomicFiles);
+            _atomicFiles = atomicFiles;
         }
 
         public string Directory { get { return _directory; } }
@@ -43,13 +51,10 @@ namespace CloudflareR2Uploader.Services
                                + "|" + (bucketName ?? string.Empty)
                                + "|" + (objectKey ?? string.Empty);
 
-            using (SHA256 sha = SHA256.Create())
-            {
-                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(composite));
-                StringBuilder builder = new StringBuilder(hash.Length * 2);
-                foreach (byte b in hash) builder.Append(b.ToString("x2", CultureInfo.InvariantCulture));
-                return builder.ToString().Substring(0, 32);
-            }
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(composite));
+            StringBuilder builder = new StringBuilder(hash.Length * 2);
+            foreach (byte b in hash) builder.Append(b.ToString("x2", CultureInfo.InvariantCulture));
+            return builder.ToString().Substring(0, 32);
         }
 
         private string GetPath(string stateId)
@@ -94,7 +99,7 @@ namespace CloudflareR2Uploader.Services
 
         public bool Save(MultipartUploadState state)
         {
-            if (state == null) throw new ArgumentNullException("state");
+            ArgumentNullException.ThrowIfNull(state);
             if (string.IsNullOrEmpty(state.StateId))
                 state.StateId = BuildStateId(state.LocalFilePath, state.BucketName, state.ObjectKey);
 
@@ -105,17 +110,15 @@ namespace CloudflareR2Uploader.Services
                 {
                     AppPaths.EnsureDirectory(_directory);
 
-                    string temp = path + ".tmp";
-                    using (FileStream stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-                    using (System.Xml.XmlDictionaryWriter writer =
-                           JsonReaderWriterFactory.CreateJsonWriter(stream, Encoding.UTF8, false, true, "  "))
+                    _atomicFiles.Write(path, stream =>
                     {
-                        new DataContractJsonSerializer(typeof(MultipartUploadState)).WriteObject(writer, state);
-                        writer.Flush();
-                    }
-
-                    if (File.Exists(path)) File.Delete(path);
-                    File.Move(temp, path);
+                        using (System.Xml.XmlDictionaryWriter writer =
+                               JsonReaderWriterFactory.CreateJsonWriter(stream, Encoding.UTF8, false, true, "  "))
+                        {
+                            new DataContractJsonSerializer(typeof(MultipartUploadState)).WriteObject(writer, state);
+                            writer.Flush();
+                        }
+                    });
                     return true;
                 }
                 catch (Exception ex) when (IsRecoverable(ex))
@@ -314,7 +317,7 @@ namespace CloudflareR2Uploader.Services
             return true;
         }
 
-        private void TryDeleteFile(string path)
+        private static void TryDeleteFile(string path)
         {
             try
             {

@@ -24,9 +24,12 @@ namespace CloudflareR2Uploader.Services
         public SingleInstanceCoordinator(string instanceQualifier = null)
         {
             string userHash = GetCurrentUserHash();
-            string qualifierSuffix = string.IsNullOrWhiteSpace(instanceQualifier)
+            string qualifierHash = string.IsNullOrWhiteSpace(instanceQualifier)
                 ? string.Empty
-                : "." + HashUserIdentifier(instanceQualifier).Substring(0, 12);
+                : HashUserIdentifier(instanceQualifier);
+            string qualifierSuffix = qualifierHash.Length == 0
+                ? string.Empty
+                : string.Concat(".", qualifierHash.AsSpan(0, 12));
             bool created;
             _mutex = new Mutex(true, @"Local\CloudflareR2Uploader." + userHash + qualifierSuffix, out created);
             _ownsMutex = created;
@@ -71,7 +74,7 @@ namespace CloudflareR2Uploader.Services
                         await server.WaitForConnectionAsync(cancellationToken).ConfigureAwait(false);
                         using (StreamReader reader = new StreamReader(server, Encoding.UTF8, false, 256, true))
                         {
-                            string message = await reader.ReadLineAsync().ConfigureAwait(false);
+                            string message = await reader.ReadLineAsync(cancellationToken).ConfigureAwait(false);
                             if (string.Equals(message, "SHOW", StringComparison.Ordinal))
                             {
                                 EventHandler handler = ActivationRequested;
@@ -95,13 +98,10 @@ namespace CloudflareR2Uploader.Services
 
         internal static string HashUserIdentifier(string identifier)
         {
-            using (SHA256 sha = SHA256.Create())
-            {
-                byte[] hash = sha.ComputeHash(Encoding.UTF8.GetBytes(identifier ?? string.Empty));
-                StringBuilder result = new StringBuilder(24);
-                for (int i = 0; i < 12; i++) result.Append(hash[i].ToString("x2"));
-                return result.ToString();
-            }
+            byte[] hash = SHA256.HashData(Encoding.UTF8.GetBytes(identifier ?? string.Empty));
+            StringBuilder result = new StringBuilder(24);
+            for (int i = 0; i < 12; i++) result.Append(hash[i].ToString("x2"));
+            return result.ToString();
         }
 
         private static string GetCurrentUserHash()
