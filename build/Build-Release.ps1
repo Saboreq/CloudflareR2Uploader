@@ -72,7 +72,7 @@ $InnoSetupCompiler = Resolve-InnoSetupCompilerRegistration `
     -RequestedCompiler $InnoSetupCompiler `
     -RequiredVersion $requiredInnoSetupVersion
 
-$dotnet = Get-Command dotnet -ErrorAction Stop
+$dotnet = @(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0]
 
 if ($hasUpdateUrl) {
     $signerProject = Join-Path $repositoryRoot 'tools\CloudflareR2Uploader.UpdateSigner\CloudflareR2Uploader.UpdateSigner.csproj'

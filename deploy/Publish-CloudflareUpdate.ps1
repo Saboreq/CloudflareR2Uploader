@@ -425,9 +425,9 @@ try {
     }
 
     # No child process can start before the installer/certificate path and byte guards above.
-    $dotnet = Get-Command dotnet -CommandType Application -ErrorAction Stop
-    $npx = Get-Command npx -CommandType Application -ErrorAction Stop
-    $curl = Get-Command curl -CommandType Application -ErrorAction Stop
+    $dotnet = @(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0]
+    $npx = @(Get-Command npx -CommandType Application -ErrorAction Stop)[0]
+    $curl = @(Get-Command curl -CommandType Application -ErrorAction Stop)[0]
 
     & $dotnet.Source build $signerProject -c Release --nologo -v:minimal
     if ($LASTEXITCODE -ne 0) { throw 'The update signer build failed.' }

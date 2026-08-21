@@ -272,6 +272,27 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void ReleaseScripts_SelectTheFirstPathResolvedApplicationForExternalCommands()
+        {
+            string build = ReadRepositoryFile("build", "Build-Release.ps1");
+            string publisher = ReadRepositoryFile("deploy", "Publish-CloudflareUpdate.ps1");
+            string harness = ReadRepositoryFile("tests", "PowerShell", "Test-UpdateReleaseScripts.ps1");
+
+            StringAssert.Contains(
+                build,
+                "$dotnet = @(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0]");
+            foreach (string command in new[] { "dotnet", "npx", "curl" })
+            {
+                StringAssert.Contains(
+                    publisher,
+                    $"${command} = @(Get-Command {command} -CommandType Application -ErrorAction Stop)[0]");
+            }
+            StringAssert.Contains(
+                harness,
+                "$realDotnet = (@(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0]).Source");
+        }
+
+        [TestMethod]
         public void ReleaseVersionPatterns_AgreeOnTheStrictPublishableSemVerGrammar()
         {
             string buildPattern = ExtractPublishableSemanticVersionPattern(

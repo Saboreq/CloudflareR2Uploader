@@ -10,7 +10,7 @@ $innoRegistrationScript = Join-Path $repositoryRoot 'build\InnoSetupRegistration
 $publishScript = Join-Path $repositoryRoot 'deploy\Publish-CloudflareUpdate.ps1'
 $signerAssembly = Join-Path $repositoryRoot 'tools\CloudflareR2Uploader.UpdateSigner\bin\Release\net10.0\CloudflareR2Uploader.UpdateSigner.dll'
 $genuineInstallerAssembly = Join-Path $repositoryRoot 'tests\CloudflareR2Uploader.UpdateSigner.Tests\bin\Release\net10.0\CloudflareR2Uploader.UpdateSigner.Tests.dll'
-$realDotnet = (Get-Command dotnet -CommandType Application -ErrorAction Stop).Source
+$realDotnet = (@(Get-Command dotnet -CommandType Application -ErrorAction Stop)[0]).Source
 . $innoRegistrationScript
 if (-not (Test-Path -LiteralPath $genuineInstallerAssembly -PathType Leaf)) {
     throw 'The genuine PE fixture assembly must be built before the PowerShell behavioral tests.'
