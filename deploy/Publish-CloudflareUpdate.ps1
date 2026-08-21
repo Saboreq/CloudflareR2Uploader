@@ -168,6 +168,21 @@ try {
         if ($LASTEXITCODE -ne 0) { throw "Wrangler failed with exit code $LASTEXITCODE." }
     }
 
+    function New-CmdBatchArguments([string]$CommandPath, [string[]]$CommandArguments) {
+        $quotedTokens = [System.Collections.Generic.List[string]]::new()
+        foreach ($Value in @($CommandPath) + @($CommandArguments)) {
+            if ([string]::IsNullOrEmpty($Value) -or
+                $Value.Contains('"') -or
+                $Value.Contains('%') -or
+                $Value.Contains('!') -or
+                [regex]::IsMatch($Value, '[\x00-\x1F\x7F]')) {
+                throw 'The authenticated R2 batch command contains unsupported characters.'
+            }
+            $quotedTokens.Add('"' + $Value + '"')
+        }
+        return '/d /s /v:off /c "' + ($quotedTokens -join ' ') + '"'
+    }
+
     function Receive-WranglerObject(
         [string]$ObjectPath,
         [string]$Destination,
@@ -195,16 +210,7 @@ try {
             $commandExtension = [System.IO.Path]::GetExtension($npx.Source)
             if ($commandExtension -ieq '.cmd' -or $commandExtension -ieq '.bat') {
                 $startInfo.FileName = $env:ComSpec
-                $startInfo.ArgumentList.Add('/d')
-                $startInfo.ArgumentList.Add('/s')
-                $startInfo.ArgumentList.Add('/c')
-                $quotedCommand = '""' + $npx.Source.Replace('"', '""') + '"'
-                foreach ($argument in $wranglerArguments) {
-                    if ($argument.Contains('"')) { throw 'The authenticated R2 object path is invalid.' }
-                    $quotedCommand += ' "' + $argument + '"'
-                }
-                $quotedCommand += '"'
-                $startInfo.ArgumentList.Add($quotedCommand)
+                $startInfo.Arguments = New-CmdBatchArguments $npx.Source $wranglerArguments
             }
             else {
                 $startInfo.FileName = $npx.Source

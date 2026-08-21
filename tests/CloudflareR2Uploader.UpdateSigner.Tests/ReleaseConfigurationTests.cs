@@ -331,6 +331,26 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void Publisher_LaunchesBatchWranglerWithOneValidatedCmdCommandString()
+        {
+            string publisher = ReadRepositoryFile("deploy", "Publish-CloudflareUpdate.ps1");
+
+            StringAssert.Contains(publisher, "function New-CmdBatchArguments");
+            StringAssert.Contains(publisher, "$Value.Contains('\"')");
+            StringAssert.Contains(publisher, "$Value.Contains('%')");
+            StringAssert.Contains(publisher, "$Value.Contains('!')");
+            StringAssert.Contains(publisher, "[\\x00-\\x1F\\x7F]");
+            StringAssert.Contains(publisher, "'/d /s /v:off /c \"'");
+            StringAssert.Contains(
+                publisher,
+                "$startInfo.Arguments = New-CmdBatchArguments $npx.Source $wranglerArguments");
+            Assert.IsFalse(
+                publisher.Contains("$startInfo.ArgumentList.Add($quotedCommand)", StringComparison.Ordinal),
+                "A prequoted cmd command must not be quoted again through ArgumentList.");
+            StringAssert.Contains(publisher, "$line -ceq $wranglerMissingKeyDiagnostic");
+        }
+
+        [TestMethod]
         public void ReleaseVersionPatterns_AgreeOnTheStrictPublishableSemVerGrammar()
         {
             string buildPattern = ExtractPublishableSemanticVersionPattern(
