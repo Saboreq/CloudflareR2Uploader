@@ -130,6 +130,7 @@ try {
     function Invoke-Signer {
         param(
             [Parameter(Mandatory = $true)]
+            [AllowEmptyString()]
             [string[]]$Arguments,
             [switch]$CaptureOutput
         )
@@ -147,6 +148,7 @@ try {
     function Invoke-CertificateSigner {
         param(
             [Parameter(Mandatory = $true)]
+            [AllowEmptyString()]
             [string[]]$Arguments,
             [switch]$CaptureOutput
         )

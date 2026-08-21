@@ -311,6 +311,29 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void Publisher_SignerForwardersAllowRequiredEmptyArgumentValues()
+        {
+            string publisher = ReadRepositoryFile("deploy", "Publish-CloudflareUpdate.ps1");
+
+            int signer = publisher.IndexOf("function Invoke-Signer", StringComparison.Ordinal);
+            int certificateSigner = publisher.IndexOf("function Invoke-CertificateSigner", StringComparison.Ordinal);
+            int wrangler = publisher.IndexOf("function Invoke-Wrangler", StringComparison.Ordinal);
+            Assert.IsTrue(signer >= 0 && certificateSigner > signer && wrangler > certificateSigner);
+            int signerAllowance = publisher.IndexOf("[AllowEmptyString()]", signer, StringComparison.Ordinal);
+            int certificateSignerAllowance = publisher.IndexOf(
+                "[AllowEmptyString()]", certificateSigner, StringComparison.Ordinal);
+            Assert.IsTrue(
+                signerAllowance > signer && signerAllowance < certificateSigner,
+                "The direct signer wrapper must accept an empty argument element.");
+            Assert.IsTrue(
+                certificateSignerAllowance > certificateSigner && certificateSignerAllowance < wrangler,
+                "The certificate signer wrapper must accept an empty argument element.");
+            StringAssert.Contains(
+                publisher,
+                "'--installer-url', $installerUrl, '--notes', $ReleaseNotes,");
+        }
+
+        [TestMethod]
         public void ReleaseVersionPatterns_AgreeOnTheStrictPublishableSemVerGrammar()
         {
             string buildPattern = ExtractPublishableSemanticVersionPattern(
