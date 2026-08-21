@@ -293,6 +293,24 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void Publisher_ValidatesLowercaseBucketNamesCaseSensitivelyBeforeChildDiscovery()
+        {
+            string publisher = ReadRepositoryFile("deploy", "Publish-CloudflareUpdate.ps1");
+            string harness = ReadRepositoryFile("tests", "PowerShell", "Test-UpdateReleaseScripts.ps1");
+
+            int bucketValidation = publisher.IndexOf("$BucketName -cnotmatch", StringComparison.Ordinal);
+            int childDiscovery = publisher.IndexOf("Get-Command dotnet", StringComparison.Ordinal);
+            Assert.IsTrue(
+                bucketValidation >= 0 && childDiscovery > bucketValidation,
+                "Lowercase bucket validation must be case-sensitive and precede child discovery.");
+            Assert.IsFalse(
+                publisher.Contains("$BucketName -notmatch", StringComparison.Ordinal),
+                "PowerShell's default regex matching would accept uppercase bucket names.");
+            StringAssert.Contains(harness, "Name = 'invalid-bucket';");
+            StringAssert.Contains(harness, "Bucket = 'BAD';");
+        }
+
+        [TestMethod]
         public void ReleaseVersionPatterns_AgreeOnTheStrictPublishableSemVerGrammar()
         {
             string buildPattern = ExtractPublishableSemanticVersionPattern(

@@ -388,7 +388,7 @@ try {
         -not [uint16]::TryParse($Matches.patch, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionPatch)) {
         throw 'Version cannot be represented by Windows file-version metadata.'
     }
-    if ($BucketName -notmatch '^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$') { throw 'BucketName must be a valid 3-63 character R2 bucket name.' }
+    if ($BucketName -cnotmatch '^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$') { throw 'BucketName must be a valid 3-63 character R2 bucket name.' }
     if ($Prefix -notmatch '^[0-9A-Za-z][0-9A-Za-z._/-]*$' -or $Prefix.Contains('..')) { throw 'Prefix contains unsupported path characters.' }
     if ([string]::IsNullOrWhiteSpace($SigningCertificatePath)) { throw 'SigningCertificatePath is required.' }
     if ([string]::IsNullOrWhiteSpace($SigningCertificatePasswordEnvironmentVariable)) { throw 'SigningCertificatePasswordEnvironmentVariable is required.' }
