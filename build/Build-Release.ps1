@@ -184,8 +184,16 @@ try {
     $versionInfo = [System.Diagnostics.FileVersionInfo]::GetVersionInfo($installerPath)
     if ($versionInfo.ProductName.Trim() -ne 'Cloudflare R2 Uploader' -or
         $versionInfo.FileDescription.Trim() -ne 'Cloudflare R2 Uploader Setup' -or
-        $versionInfo.FileVersion -ne $numericVersion) {
-        throw 'The generated EXE does not contain the expected Inno Setup release metadata.'
+        $versionInfo.FileMajorPart -ne $versionMajor -or
+        $versionInfo.FileMinorPart -ne $versionMinor -or
+        $versionInfo.FileBuildPart -ne $versionPatch -or
+        $versionInfo.FilePrivatePart -ne 0) {
+        throw ('The generated EXE does not contain the expected Inno Setup release metadata. ' +
+            'Actual numeric file version: {0}.{1}.{2}.{3}.' -f
+            $versionInfo.FileMajorPart,
+            $versionInfo.FileMinorPart,
+            $versionInfo.FileBuildPart,
+            $versionInfo.FilePrivatePart)
     }
 
     $releaseFiles = @(Get-ChildItem -LiteralPath $resolvedOutput -File | Where-Object { $_.Name -like 'CloudflareR2Uploader-v*' })

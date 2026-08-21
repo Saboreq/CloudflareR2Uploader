@@ -193,7 +193,14 @@ namespace CloudflareR2Uploader.Tests
             int sign = script.IndexOf("'sign', '--pfx'", StringComparison.Ordinal);
             int network = script.IndexOf("Receive-WranglerObject", script.IndexOf("$remoteInstallerExists", StringComparison.Ordinal), StringComparison.Ordinal);
             Assert.IsTrue(metadata >= 0 && sign > metadata && network > metadata);
-            StringAssert.Contains(build, "$versionInfo.FileVersion -ne $numericVersion");
+            StringAssert.Contains(build, "$versionInfo.FileMajorPart -ne $versionMajor");
+            StringAssert.Contains(build, "$versionInfo.FileMinorPart -ne $versionMinor");
+            StringAssert.Contains(build, "$versionInfo.FileBuildPart -ne $versionPatch");
+            StringAssert.Contains(build, "$versionInfo.FilePrivatePart -ne 0");
+            Assert.IsFalse(
+                build.Contains("$versionInfo.FileVersion -ne $numericVersion", StringComparison.Ordinal),
+                "Installer validation must use fixed numeric version fields instead of localized display text.");
+            StringAssert.Contains(build, "Actual numeric file version: {0}.{1}.{2}.{3}.");
             StringAssert.Contains(installer, "VersionInfoProductName=Cloudflare R2 Uploader");
             StringAssert.Contains(installer, "VersionInfoDescription=Cloudflare R2 Uploader Setup");
             foreach (string caseName in new[] { "metadata-stub", "metadata-wrong-product", "metadata-wrong-version", "metadata-malformed" })
