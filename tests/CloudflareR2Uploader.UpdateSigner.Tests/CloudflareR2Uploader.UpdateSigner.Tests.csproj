@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <Import Project="..\..\build\Tests.props" />
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <AssemblyName>CloudflareR2Uploader.UpdateSigner.Tests</AssemblyName>
+    <!-- Standalone default for the genuine PE fixture. Release builds may override this
+         globally; tests and the PowerShell harness derive the actual embedded version. -->
+    <AssemblyVersion>2.0.0.0</AssemblyVersion>
+    <FileVersion>2.0.0.0</FileVersion>
+    <Product>Cloudflare R2 Uploader</Product>
+    <AssemblyTitle>Cloudflare R2 Uploader Setup</AssemblyTitle>
+    <Description>Cloudflare R2 Uploader Setup</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\tools\CloudflareR2Uploader.UpdateSigner\CloudflareR2Uploader.UpdateSigner.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\TestSupport.cs" Link="Shared\TestSupport.cs" />
+  </ItemGroup>
+
+</Project>

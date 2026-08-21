@@ -1,13 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Contains files the legacy WinForms project compiles as links; see build\Modern.props. -->
-    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
-  </PropertyGroup>
-
-  <Import Project="..\..\build\Modern.props" />
-
-  <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <RootNamespace>CloudflareR2Uploader</RootNamespace>
     <AssemblyName>CloudflareR2Uploader.Infrastructure.R2</AssemblyName>
@@ -15,8 +8,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <!-- Pinned to the exact versions the WinForms build ships, so request shapes and
-         multipart behaviour are identical across both front ends. -->
+    <!-- Pinned versions preserve the supported Cloudflare R2 request shapes and
+         multipart-upload behaviour. -->
     <PackageReference Include="AWSSDK.S3" Version="3.7.511.8" />
     <PackageReference Include="MetadataExtractor" Version="2.9.3" />
     <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />

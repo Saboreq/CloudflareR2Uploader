@@ -5,8 +5,8 @@ using CloudflareR2Uploader.Utilities;
 namespace CloudflareR2Uploader.Services
 {
     /// <summary>
-    /// Copies text to the system clipboard. Abstracted because WinForms and WPF have
-    /// separate clipboard APIs and because tests must never touch the real clipboard.
+    /// Copies text to the system clipboard. The platform boundary keeps WPF-specific APIs
+    /// out of Core and ensures tests never touch the real clipboard.
     /// </summary>
     public interface IClipboardService
     {
@@ -24,10 +24,12 @@ namespace CloudflareR2Uploader.Services
 
     public sealed class PublicUrlService
     {
+        private readonly Func<string, string, string> _urlBuilder = ObjectKeyUtility.BuildPublicUrl;
+
         public string Build(string publicBaseUrl, R2BrowserItem item)
         {
             if (item == null || item.IsFolder || string.IsNullOrWhiteSpace(publicBaseUrl)) return null;
-            return ObjectKeyUtility.BuildPublicUrl(publicBaseUrl, item.Key);
+            return _urlBuilder(publicBaseUrl, item.Key);
         }
     }
 }

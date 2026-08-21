@@ -21,7 +21,7 @@ namespace CloudflareR2Uploader.Services
 
         public async Task<R2ObjectProperties> GetAsync(AppSettings settings, R2Credentials credentials, R2BrowserItem item, CancellationToken cancellationToken)
         {
-            if (item == null) throw new ArgumentNullException("item");
+            ArgumentNullException.ThrowIfNull(item);
             if (item.IsFolder) return CreateFolder(settings, item);
             string cacheKey = BuildCacheKey(settings, item);
             lock (_gate)
@@ -50,7 +50,7 @@ namespace CloudflareR2Uploader.Services
                 List<string> keys = new List<string>();
                 foreach (string key in _cache.Keys)
                     if (key.StartsWith((profileId ?? string.Empty) + "|" + (bucket ?? string.Empty) + "|", StringComparison.OrdinalIgnoreCase) &&
-                        (string.IsNullOrEmpty(keyOrPrefix) || key.IndexOf("|" + keyOrPrefix, StringComparison.Ordinal) >= 0)) keys.Add(key);
+                        (string.IsNullOrEmpty(keyOrPrefix) || key.Contains("|" + keyOrPrefix, StringComparison.Ordinal))) keys.Add(key);
                 foreach (string key in keys) _cache.Remove(key);
             }
         }

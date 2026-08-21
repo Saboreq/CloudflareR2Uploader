@@ -61,8 +61,8 @@ namespace CloudflareR2Uploader.Services
         /// <summary>Aggregates over the same predicate as <see cref="QueryAsync"/>.</summary>
         Task<ActivitySummary> SummarizeAsync(ActivityQuery query, CancellationToken cancellationToken = default);
 
-        /// <summary>Removes every record and the backing file.</summary>
-        Task ClearAsync(CancellationToken cancellationToken = default);
+        /// <summary>Removes every record and the backing file. Returns false when the backing file remains.</summary>
+        Task<bool> ClearAsync(CancellationToken cancellationToken = default);
 
         /// <summary>
         /// Drops records older than the retention window and enforces the file-size bound.

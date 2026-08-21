@@ -18,7 +18,7 @@ namespace CloudflareR2Uploader.Utilities
             while (end > start && prefix[end - 1] == '/') end--;
 
             if (end == start) return string.Empty;
-            return prefix.Substring(start, end - start) + "/";
+            return string.Concat(prefix.AsSpan(start, end - start), "/");
         }
 
         public static string GetParentPrefix(string prefix)

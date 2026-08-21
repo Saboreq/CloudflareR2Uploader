@@ -49,9 +49,9 @@ namespace CloudflareR2Uploader.Services
             SpeedEstimator speedEstimator,
             CancellationToken cancellationToken)
         {
-            if (client == null) throw new ArgumentNullException("client");
-            if (item == null) throw new ArgumentNullException("item");
-            if (retryService == null) throw new ArgumentNullException("retryService");
+            ArgumentNullException.ThrowIfNull(client);
+            ArgumentNullException.ThrowIfNull(item);
+            ArgumentNullException.ThrowIfNull(retryService);
 
             ProgressThrottle throttle = new ProgressThrottle();
 

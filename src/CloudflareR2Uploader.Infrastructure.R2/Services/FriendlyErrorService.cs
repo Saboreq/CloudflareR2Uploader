@@ -39,6 +39,8 @@ namespace CloudflareR2Uploader.Services
     /// </summary>
     public static class FriendlyErrorService
     {
+        private static readonly string[] LineSeparators = { "\r\n", "\n" };
+
         public static FriendlyError Describe(Exception exception, AppSettings settings, string objectKey = null)
         {
             if (exception == null)
@@ -391,7 +393,7 @@ namespace CloudflareR2Uploader.Services
 
             // Final safety pass: sanitise line by line so the redaction rules apply to every
             // line while the layout survives.
-            string[] lines = builder.ToString().Split(new[] { "\r\n", "\n" }, StringSplitOptions.None);
+            string[] lines = builder.ToString().Split(LineSeparators, StringSplitOptions.None);
             for (int i = 0; i < lines.Length; i++) lines[i] = LoggingService.Sanitize(lines[i]);
             return string.Join(Environment.NewLine, lines);
         }

@@ -90,7 +90,7 @@ namespace CloudflareR2Uploader.Services
             CancellationToken cancellationToken,
             Action<RetryAttemptInfo> onRetry = null)
         {
-            if (operation == null) throw new ArgumentNullException("operation");
+            ArgumentNullException.ThrowIfNull(operation);
 
             int attempt = 0;
             while (true)
@@ -190,7 +190,7 @@ namespace CloudflareR2Uploader.Services
             if (_random == null)
             {
                 // Thread-local seeds keep concurrent part retries from lining up.
-                _random = new Random(Environment.TickCount ^ Thread.CurrentThread.ManagedThreadId * 7919);
+                _random = new Random(Environment.TickCount ^ Environment.CurrentManagedThreadId * 7919);
             }
             return _random;
         }

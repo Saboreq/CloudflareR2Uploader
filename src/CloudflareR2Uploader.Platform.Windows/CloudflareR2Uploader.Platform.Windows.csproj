@@ -1,30 +1,17 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <!-- Contains files the legacy WinForms project compiles as links; see build\Modern.props. -->
-    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
-  </PropertyGroup>
-
-  <Import Project="..\..\build\Modern.props" />
-
-  <PropertyGroup>
     <TargetFramework>net10.0-windows</TargetFramework>
     <RootNamespace>CloudflareR2Uploader</RootNamespace>
     <AssemblyName>CloudflareR2Uploader.Platform.Windows</AssemblyName>
     <Description>Windows integration: DPAPI credential protection, per-user startup registration, single-instance coordination, notification-area host, OS theme detection and verified updates.</Description>
 
     <!--
-      WPF has no notification-area control. UseWindowsForms is enabled on this project
-      alone so TrayIconHost can wrap System.Windows.Forms.NotifyIcon, which is the
-      supported Shell_NotifyIcon wrapper in the Windows Desktop pack. The WPF project
-      never enables UseWindowsForms and never references WinForms types.
+      TrayIconHost wraps System.Windows.Forms.NotifyIcon, the supported Shell_NotifyIcon
+      wrapper in the Windows Desktop pack.
     -->
     <UseWindowsForms>true</UseWindowsForms>
   </PropertyGroup>
-
-  <ItemGroup>
-    <PackageReference Include="Newtonsoft.Json" Version="13.0.4" />
-  </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\CloudflareR2Uploader.Core\CloudflareR2Uploader.Core.csproj" />

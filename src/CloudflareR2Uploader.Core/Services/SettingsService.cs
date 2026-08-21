@@ -18,11 +18,19 @@ namespace CloudflareR2Uploader.Services
     {
         private readonly ILoggingService _log;
         private readonly string _filePath;
+        private readonly IAtomicFileWriter _atomicFiles;
 
         public SettingsService(ILoggingService log, string filePath = null)
+            : this(log, filePath, AtomicFileWriter.Shared)
+        {
+        }
+
+        internal SettingsService(ILoggingService log, string filePath, IAtomicFileWriter atomicFiles)
         {
             _log = log;
             _filePath = string.IsNullOrEmpty(filePath) ? AppPaths.SettingsFilePath : filePath;
+            ArgumentNullException.ThrowIfNull(atomicFiles);
+            _atomicFiles = atomicFiles;
         }
 
         public string FilePath { get { return _filePath; } }
@@ -74,23 +82,20 @@ namespace CloudflareR2Uploader.Services
         /// <summary>Writes settings atomically. Returns false if the file could not be written.</summary>
         public bool Save(AppSettings settings)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
+            ArgumentNullException.ThrowIfNull(settings);
 
             try
             {
                 settings.Clamp();
                 AppPaths.EnsureDirectory(Path.GetDirectoryName(_filePath));
 
-                string temp = _filePath + ".tmp";
-
-                using (FileStream stream = new FileStream(temp, FileMode.Create, FileAccess.Write, FileShare.None))
-                using (JsonWriter writer = new JsonWriter(stream))
+                _atomicFiles.Write(_filePath, stream =>
                 {
-                    CreateSerializer().WriteObject(writer.Writer, settings);
-                }
-
-                if (File.Exists(_filePath)) File.Delete(_filePath);
-                File.Move(temp, _filePath);
+                    using (JsonWriter writer = new JsonWriter(stream))
+                    {
+                        CreateSerializer().WriteObject(writer.Writer, settings);
+                    }
+                });
 
                 if (_log != null) _log.Info("Settings.Save", "Settings saved (no credential fields are stored in this file).");
                 return true;

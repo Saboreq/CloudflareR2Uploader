@@ -19,8 +19,8 @@ namespace CloudflareR2Uploader.Wpf.Views.Files
     /// lazily so a user who never previews a PDF never pays for a browser process.
     /// </para>
     /// <para>
-    /// Security posture, unchanged from the WinForms build: the control is pointed at a
-    /// local cached file only, its user-data folder is the application's own, and every
+    /// The control is pointed at a local cached file only, its user-data folder is the
+    /// application's own, and every
     /// navigation to anything other than that exact file is cancelled. It never sees a
     /// signed or public R2 URL.
     /// </para>
@@ -167,7 +167,7 @@ namespace CloudflareR2Uploader.Wpf.Views.Files
 
         /// <summary>
         /// WebView2 is optional. Without it the rest of the application keeps working and the
-        /// document preview degrades to an honest message, exactly as the WinForms build did.
+        /// document preview degrades to an honest message.
         /// </summary>
         private void ShowRuntimeMissing()
         {

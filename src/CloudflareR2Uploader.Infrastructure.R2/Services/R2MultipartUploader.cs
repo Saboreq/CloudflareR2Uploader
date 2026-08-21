@@ -79,10 +79,10 @@ namespace CloudflareR2Uploader.Services
             SpeedEstimator speedEstimator,
             CancellationToken cancellationToken)
         {
-            if (client == null) throw new ArgumentNullException("client");
-            if (item == null) throw new ArgumentNullException("item");
-            if (settings == null) throw new ArgumentNullException("settings");
-            if (retryService == null) throw new ArgumentNullException("retryService");
+            ArgumentNullException.ThrowIfNull(client);
+            ArgumentNullException.ThrowIfNull(item);
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(retryService);
 
             long fileSize = item.FileSize;
             string stateId = UploadStateStore.BuildStateId(item.LocalFilePath, bucketName, objectKey);
@@ -456,7 +456,7 @@ namespace CloudflareR2Uploader.Services
             }
         }
 
-        private async Task<CompletedPartState> UploadPartWithRetryAsync(
+        private static async Task<CompletedPartState> UploadPartWithRetryAsync(
             IAmazonS3 client,
             string bucketName,
             string objectKey,

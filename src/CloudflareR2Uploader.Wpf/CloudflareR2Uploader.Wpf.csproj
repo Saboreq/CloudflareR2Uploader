@@ -1,7 +1,5 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <Import Project="..\..\build\Modern.props" />
-
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
     <TargetFramework>net10.0-windows</TargetFramework>
@@ -27,8 +25,8 @@
     <PublishSingleFile>false</PublishSingleFile>
     <RuntimeIdentifiers>win-x64;win-arm64</RuntimeIdentifiers>
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <!-- This is a WPF application. WinForms is referenced only for NotifyIcon, so its
-         manifest-specific DPI warning does not apply to our WPF startup path. -->
+    <!-- This is a WPF application. The Windows Forms integration assembly is referenced only
+         for NotifyIcon, so its manifest-specific DPI warning does not apply to WPF startup. -->
     <NoWarn>$(NoWarn);WFO0003</NoWarn>
   </PropertyGroup>
 

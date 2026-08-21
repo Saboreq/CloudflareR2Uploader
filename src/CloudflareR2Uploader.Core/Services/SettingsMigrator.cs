@@ -31,21 +31,21 @@ namespace CloudflareR2Uploader.Services
     /// credentials are never touched here, and neither is resumable multipart state.
     /// </para>
     /// <para>
-    /// Both front ends run this, so a settings file stays usable if the user moves back to
-    /// the WinForms build.
+    /// The migration remains responsible for files written by pre-WPF releases so existing
+    /// installations upgrade without losing preferences.
     /// </para>
     /// </summary>
     public static class SettingsMigrator
     {
         /// <summary>
-        /// A file written before the WPF front end has no <c>schemaVersion</c> member at all,
+        /// A file written before the WPF application has no <c>schemaVersion</c> member at all,
         /// so <see cref="AppSettings.SchemaVersion"/> deserialises as 0. It is version 1.
         /// </summary>
         private const int UnversionedSchema = 1;
 
         public static SettingsMigrationResult Migrate(AppSettings settings)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
+            ArgumentNullException.ThrowIfNull(settings);
 
             int fromVersion = settings.SchemaVersion <= 0 ? UnversionedSchema : settings.SchemaVersion;
 
@@ -66,12 +66,12 @@ namespace CloudflareR2Uploader.Services
         }
 
         /// <summary>
-        /// Schema 1 → 2: the fields the WPF front end added. Every seed reproduces what the
-        /// WinForms build did, so nothing about the user's experience changes on upgrade.
+        /// Schema 1 → 2: the fields introduced by the WPF application. Every seed reproduces
+        /// the prior release behavior so the user's experience stays stable on upgrade.
         /// </summary>
         private static void MigrateOneToTwo(AppSettings settings)
         {
-            // The WinForms build had no theme picker and was dark only.
+            // Schema 1 releases had no theme picker and were dark only.
             settings.Theme = AppTheme.Dark;
 
             // It also had no configurable expiry; the temporary-link dialog defaulted to a day.
@@ -93,7 +93,7 @@ namespace CloudflareR2Uploader.Services
             // Activity history is new; it starts enabled with the documented default window.
             if (settings.ActivityRetentionDays <= 0) settings.ActivityRetentionDays = 30;
 
-            // The WinForms build had one aggregate "show tray notifications" switch. Honour it
+            // Schema 1 had one aggregate "show tray notifications" switch. Honour it
             // rather than turning every new per-event toggle on regardless.
             settings.NotifyOnTransferComplete = settings.ShowTrayNotifications;
             settings.NotifyOnTransferFailure = settings.ShowTrayNotifications;

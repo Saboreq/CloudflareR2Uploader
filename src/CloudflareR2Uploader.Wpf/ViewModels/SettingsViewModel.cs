@@ -68,6 +68,7 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
         private bool _loading;
         private bool _disposed;
         private UpdateManifest? _availableUpdate;
+        private UpdateSourceConfiguration? _availableUpdateSource;
 
         public SettingsViewModel(
             IAppSession session,
@@ -427,8 +428,8 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
                 profile.AccountId = AccountId.Trim();
                 profile.BucketName = BucketName.Trim();
 
-                // An endpoint that matches the derived one is stored as "no override", which
-                // is what the WinForms build did and keeps settings.json tidy.
+                // An endpoint that matches the derived one is stored as "no override" to keep
+                // settings.json tidy and preserve the existing on-disk contract.
                 string derived = BuildDerivedEndpoint(AccountId);
                 profile.CustomEndpoint = string.Equals(Endpoint.Trim(), derived, StringComparison.OrdinalIgnoreCase)
                     ? string.Empty
@@ -742,10 +743,11 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
         private async Task CheckForUpdatesAsync()
         {
             _availableUpdate = null;
+            _availableUpdateSource = null;
             InstallUpdateCommand.NotifyCanExecuteChanged();
 
-            string? manifestUrl = UpdateService.LoadManifestUrl(AppContext.BaseDirectory);
-            if (string.IsNullOrEmpty(manifestUrl))
+            UpdateSourceConfiguration? updateSource = UpdateService.LoadUpdateSource(AppContext.BaseDirectory);
+            if (updateSource is null)
             {
                 UpdateStatus = "This build has no update channel configured.";
                 return;
@@ -755,12 +757,13 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
             try
             {
                 UpdateCheckResult result = await _updates
-                    .CheckAsync(manifestUrl, ApplicationInfo.DisplayVersion, CancellationToken.None)
+                    .CheckAsync(updateSource, ApplicationInfo.DisplayVersion, CancellationToken.None)
                     .ConfigureAwait(true);
 
                 if (result.IsUpdateAvailable)
                 {
                     _availableUpdate = result.Manifest;
+                    _availableUpdateSource = updateSource;
                     AvailableVersion = result.Manifest.Version;
                     ReleaseNotes = result.Manifest.Notes ?? string.Empty;
                     UpdateStatus = "Version " + result.Manifest.Version + " is available (" +
@@ -787,7 +790,8 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
             }
         }
 
-        private bool CanInstallUpdate() => _availableUpdate is not null && !IsDownloadingUpdate;
+        private bool CanInstallUpdate() =>
+            _availableUpdate is not null && _availableUpdateSource is not null && !IsDownloadingUpdate;
 
         partial void OnIsDownloadingUpdateChanged(bool value)
         {
@@ -799,20 +803,19 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
         private async Task InstallUpdateAsync()
         {
             UpdateManifest? manifest = _availableUpdate;
-            if (manifest is null || IsDownloadingUpdate) return;
+            UpdateSourceConfiguration? updateSource = _availableUpdateSource;
+            if (manifest is null || updateSource is null || IsDownloadingUpdate) return;
 
             IsDownloadingUpdate = true;
             try
             {
                 Progress<UpdateDownloadProgress> progress = new(download =>
                 {
-                    UpdateStatus = download.TotalBytes > 0
-                        ? "Downloading updateâ€¦ " + download.Percentage.ToString(CultureInfo.CurrentCulture) + "%"
-                        : "Downloading updateâ€¦ " + FileSizeFormatter.Format(download.BytesReceived);
+                    UpdateStatus = FormatUpdateProgress(download);
                 });
 
                 string installer = await _updates
-                    .DownloadInstallerAsync(manifest, progress, CancellationToken.None)
+                    .DownloadInstallerAsync(updateSource, manifest, progress, CancellationToken.None)
                     .ConfigureAwait(true);
 
                 UpdateStatus = "Download complete and SHA-256 verified.";
@@ -823,31 +826,7 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
                     "Install now").ConfigureAwait(true);
                 if (!confirmed) return;
 
-                if (!await _exitCoordinator.PrepareAsync().ConfigureAwait(true))
-                {
-                    UpdateStatus = "Update downloaded. Installation was postponed.";
-                    return;
-                }
-
-                try
-                {
-                    _processLauncher.Start(
-                        installer,
-                        "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1");
-                }
-                catch (Exception ex)
-                {
-                    UpdateStatus = "The verified installer could not be started.";
-                    _log.Warning("Settings.Update", "Starting the verified update installer failed (" + ex.GetType().Name + ").");
-                    await _dialogs.ShowErrorAsync(
-                        "Update could not start",
-                        "The installer was downloaded and verified, but Windows did not start it.")
-                        .ConfigureAwait(true);
-                    return;
-                }
-
-                _exitCoordinator.Commit();
-                _applicationController.Shutdown();
+                await StartVerifiedInstallerAsync(installer, updateSource, manifest).ConfigureAwait(true);
             }
             catch (OperationCanceledException)
             {
@@ -867,6 +846,49 @@ namespace CloudflareR2Uploader.Wpf.ViewModels
                 IsDownloadingUpdate = false;
             }
         }
+
+        internal async Task<bool> StartVerifiedInstallerAsync(
+            string installer,
+            UpdateSourceConfiguration updateSource,
+            UpdateManifest manifest)
+        {
+            if (!await _exitCoordinator.PrepareAsync().ConfigureAwait(true))
+            {
+                UpdateStatus = "Update downloaded. Installation was postponed.";
+                return false;
+            }
+
+            try
+            {
+                using VerifiedInstallerLaunch verified = UpdateService.OpenVerifiedInstallerForLaunch(
+                    updateSource,
+                    manifest,
+                    installer);
+                _processLauncher.Start(
+                    verified.InstallerPath,
+                    "/SILENT /SUPPRESSMSGBOXES /NORESTART /CLOSEAPPLICATIONS /UPDATE=1");
+            }
+            catch (Exception ex)
+            {
+                _exitCoordinator.ReleasePreparation();
+                UpdateStatus = "The verified installer could not be started.";
+                _log.Warning("Settings.Update", "Starting the verified update installer failed (" + ex.GetType().Name + ").");
+                await _dialogs.ShowErrorAsync(
+                    "Update could not start",
+                    "The installer was downloaded and verified, but Windows did not start it.")
+                    .ConfigureAwait(true);
+                return false;
+            }
+
+            _exitCoordinator.Commit();
+            _applicationController.Shutdown();
+            return true;
+        }
+
+        internal static string FormatUpdateProgress(UpdateDownloadProgress download) =>
+            download.TotalBytes > 0
+                ? "Downloading update… " + download.Percentage.ToString(CultureInfo.CurrentCulture) + "%"
+                : "Downloading update… " + FileSizeFormatter.Format(download.BytesReceived);
 
         [RelayCommand]
         private void OpenLogFolder() => OpenFolder(LogDirectory);

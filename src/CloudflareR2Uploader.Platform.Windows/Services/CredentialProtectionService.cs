@@ -25,11 +25,19 @@ namespace CloudflareR2Uploader.Services
 
         private readonly ILoggingService _log;
         private readonly string _filePath;
+        private readonly IAtomicFileWriter _atomicFiles;
 
         public CredentialProtectionService(ILoggingService log, string filePath = null)
+            : this(log, filePath, AtomicFileWriter.Shared)
+        {
+        }
+
+        internal CredentialProtectionService(ILoggingService log, string filePath, IAtomicFileWriter atomicFiles)
         {
             _log = log;
             _filePath = string.IsNullOrEmpty(filePath) ? AppPaths.CredentialFilePath : filePath;
+            ArgumentNullException.ThrowIfNull(atomicFiles);
+            _atomicFiles = atomicFiles;
         }
 
         public string FilePath { get { return _filePath; } }
@@ -46,7 +54,7 @@ namespace CloudflareR2Uploader.Services
         /// <summary>Encrypts and writes the credential pair. Overwrites any previous blob.</summary>
         public bool Save(R2Credentials credentials)
         {
-            if (credentials == null) throw new ArgumentNullException("credentials");
+            ArgumentNullException.ThrowIfNull(credentials);
 
             byte[] plaintext = null;
             try
@@ -66,7 +74,7 @@ namespace CloudflareR2Uploader.Services
         /// </summary>
         public bool SaveProfiles(IDictionary<string, R2Credentials> credentialsByProfile)
         {
-            if (credentialsByProfile == null) throw new ArgumentNullException("credentialsByProfile");
+            ArgumentNullException.ThrowIfNull(credentialsByProfile);
 
             byte[] plaintext = null;
             try
@@ -159,10 +167,7 @@ namespace CloudflareR2Uploader.Services
                 protectedBytes = ProtectedData.Protect(plaintext, Entropy, DataProtectionScope.CurrentUser);
 
                 AppPaths.EnsureDirectory(Path.GetDirectoryName(_filePath));
-                string temp = _filePath + ".tmp";
-                File.WriteAllBytes(temp, protectedBytes);
-                if (File.Exists(_filePath)) File.Delete(_filePath);
-                File.Move(temp, _filePath);
+                _atomicFiles.Write(_filePath, stream => stream.Write(protectedBytes, 0, protectedBytes.Length));
 
                 if (_log != null) _log.Info("Credentials.Save", logMessage);
                 return true;
@@ -329,7 +334,7 @@ namespace CloudflareR2Uploader.Services
         {
             int completeCount = CountComplete(credentialsByProfile);
             if (completeCount > MaxProfileCount)
-                throw new ArgumentException("Too many credential profiles.", "credentialsByProfile");
+                throw new ArgumentException("Too many credential profiles.", nameof(credentialsByProfile));
 
             using (MemoryStream stream = new MemoryStream())
             using (BinaryWriter writer = new BinaryWriter(stream, Encoding.UTF8))

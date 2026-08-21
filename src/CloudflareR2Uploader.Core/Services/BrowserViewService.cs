@@ -8,6 +8,9 @@ namespace CloudflareR2Uploader.Services
 {
     public sealed class BrowserViewService
     {
+        private readonly StringComparison _filterComparison = StringComparison.CurrentCultureIgnoreCase;
+        private readonly Comparer<DateTime> _dateComparer = Comparer<DateTime>.Default;
+
         public BrowserViewResult Apply(
             IEnumerable<R2BrowserItem> source,
             string filterText,
@@ -49,8 +52,8 @@ namespace CloudflareR2Uploader.Services
                     if (item.LastModifiedUtc.HasValue)
                     {
                         DateTime modified = item.LastModifiedUtc.Value;
-                        if (!summary.EarliestModifiedUtc.HasValue || modified < summary.EarliestModifiedUtc.Value) summary.EarliestModifiedUtc = modified;
-                        if (!summary.LatestModifiedUtc.HasValue || modified > summary.LatestModifiedUtc.Value) summary.LatestModifiedUtc = modified;
+                        if (!summary.EarliestModifiedUtc.HasValue || _dateComparer.Compare(modified, summary.EarliestModifiedUtc.Value) < 0) summary.EarliestModifiedUtc = modified;
+                        if (!summary.LatestModifiedUtc.HasValue || _dateComparer.Compare(modified, summary.LatestModifiedUtc.Value) > 0) summary.LatestModifiedUtc = modified;
                     }
                 }
             }
@@ -75,7 +78,7 @@ namespace CloudflareR2Uploader.Services
             }
         }
 
-        private static bool Matches(R2BrowserItem item, string filter)
+        private bool Matches(R2BrowserItem item, string filter)
         {
             if (filter.Length == 0) return true;
             string extension = Path.GetExtension(item.DisplayName ?? item.Key ?? string.Empty).TrimStart('.');
@@ -83,9 +86,9 @@ namespace CloudflareR2Uploader.Services
                    Contains(GetDisplayedType(item), filter) || Contains(extension, filter);
         }
 
-        private static bool Contains(string value, string filter)
+        private bool Contains(string value, string filter)
         {
-            return (value ?? string.Empty).IndexOf(filter, StringComparison.CurrentCultureIgnoreCase) >= 0;
+            return (value ?? string.Empty).Contains(filter, _filterComparison);
         }
 
         private sealed class IndexedItem

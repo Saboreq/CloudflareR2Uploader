@@ -17,8 +17,8 @@ namespace CloudflareR2Uploader.Utilities
         {
             string prefix = R2BrowserPathUtility.NormalizePrefix(targetPrefix);
             string leaf = leafName ?? string.Empty;
-            if (leaf.Length == 0 || leaf.IndexOf('/') >= 0 || leaf.IndexOf('\\') >= 0)
-                throw new ArgumentException("A single object or folder name is required.", "leafName");
+            if (leaf.Length == 0 || leaf.Contains('/') || leaf.Contains('\\'))
+                throw new ArgumentException("A single object or folder name is required.", nameof(leafName));
             string combined = prefix + leaf;
             return isFolder ? R2BrowserPathUtility.NormalizePrefix(combined) : combined;
         }
@@ -36,7 +36,7 @@ namespace CloudflareR2Uploader.Utilities
                 reason = "The name cannot be '.' or '..'.";
                 return false;
             }
-            if (leafName.IndexOf('/') >= 0 || leafName.IndexOf('\\') >= 0)
+            if (leafName.Contains('/') || leafName.Contains('\\'))
             {
                 reason = "Use a single name without '/' or '\\'.";
                 return false;
@@ -56,7 +56,7 @@ namespace CloudflareR2Uploader.Utilities
 
         public static string AppendCopySuffix(string destination, bool isFolder, int index)
         {
-            if (index < 1) throw new ArgumentOutOfRangeException("index");
+            ArgumentOutOfRangeException.ThrowIfLessThan(index, 1);
 
             string value = isFolder ? R2BrowserPathUtility.NormalizePrefix(destination).TrimEnd('/') : destination;
             int slash = value.LastIndexOf('/');

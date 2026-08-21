@@ -10,6 +10,8 @@ namespace CloudflareR2Uploader.Services
 {
     public sealed class BulkLocalPathMapper
     {
+        private readonly char[] _invalidFileNameCharacters = Path.GetInvalidFileNameChars();
+
         private static readonly HashSet<string> ReservedNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase)
         {
             "CON", "PRN", "AUX", "NUL", "CLOCK$",
@@ -19,7 +21,7 @@ namespace CloudflareR2Uploader.Services
 
         public void Map(BulkObjectOperationPlan plan, string destinationRoot)
         {
-            if (plan == null) throw new ArgumentNullException("plan");
+            ArgumentNullException.ThrowIfNull(plan);
             string root = Path.GetFullPath(destinationRoot ?? string.Empty).TrimEnd(Path.DirectorySeparatorChar) + Path.DirectorySeparatorChar;
             Dictionary<string, int> used = new Dictionary<string, int>(StringComparer.OrdinalIgnoreCase);
             foreach (BulkObjectEntry entry in plan.Objects)
@@ -46,10 +48,9 @@ namespace CloudflareR2Uploader.Services
             {
                 string segment = raw;
                 if (segment == "." || segment == ".." || segment.Length == 0) segment = "_";
-                char[] invalid = Path.GetInvalidFileNameChars();
                 char[] chars = segment.ToCharArray();
                 for (int i = 0; i < chars.Length; i++)
-                    if (Array.IndexOf(invalid, chars[i]) >= 0 || chars[i] == ':') chars[i] = '_';
+                    if (Array.IndexOf(_invalidFileNameCharacters, chars[i]) >= 0 || chars[i] == ':') chars[i] = '_';
                 segment = new string(chars).TrimEnd(' ', '.');
                 if (segment.Length == 0) segment = "_";
                 string stem = Path.GetFileNameWithoutExtension(segment);
@@ -64,19 +65,16 @@ namespace CloudflareR2Uploader.Services
         {
             string extension = Path.GetExtension(segment);
             if (extension.Length > 16) extension = string.Empty;
-            string hash;
-            using (SHA256 sha = SHA256.Create())
-            {
-                byte[] bytes = sha.ComputeHash(Encoding.UTF8.GetBytes(segment));
-                StringBuilder text = new StringBuilder(12);
-                for (int i = 0; i < 6; i++) text.Append(bytes[i].ToString("x2"));
-                hash = text.ToString();
-            }
+            byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(segment));
+            StringBuilder text = new StringBuilder(12);
+            for (int i = 0; i < 6; i++) text.Append(bytes[i].ToString("x2"));
+            string hash = text.ToString();
             int stemLength = Math.Max(1, 120 - extension.Length - hash.Length - 1);
-            return Path.GetFileNameWithoutExtension(segment).Substring(0, Math.Min(stemLength, Path.GetFileNameWithoutExtension(segment).Length)) + "-" + hash + extension;
+            string stem = Path.GetFileNameWithoutExtension(segment);
+            return string.Concat(stem.AsSpan(0, Math.Min(stemLength, stem.Length)), "-", hash, extension);
         }
 
-        private static string EnsureUnique(string relative, IDictionary<string, int> used)
+        private static string EnsureUnique(string relative, Dictionary<string, int> used)
         {
             int existing;
             if (!used.TryGetValue(relative, out existing))
@@ -106,7 +104,7 @@ namespace CloudflareR2Uploader.Services
     {
         public static string FindAvailable(string path, Func<string, bool> exists)
         {
-            if (exists == null) throw new ArgumentNullException("exists");
+            ArgumentNullException.ThrowIfNull(exists);
             if (!exists(path)) return path;
             string directory = Path.GetDirectoryName(path) ?? string.Empty;
             string name = Path.GetFileNameWithoutExtension(path);

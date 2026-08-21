@@ -48,27 +48,139 @@ namespace CloudflareR2Uploader.Services
     /// inside a file's parts, which keeps the speed and remaining-time figures meaningful and
     /// avoids many large files competing for the same connection pool.
     /// </summary>
-    public sealed class UploadQueueService : IDisposable
+    public sealed class UploadQueueService : IUploadQueueLifecycle, IDisposable
     {
         private readonly ILoggingService _log;
         private readonly R2UploadService _uploadService;
         private readonly UploadStateStore _stateStore;
         private readonly PauseController _pauseController = new PauseController();
+        private readonly Action<UploadQueueItem> _retryItem = RetryItemCore;
+        private readonly Action<UploadQueueItem> _cancelItem = CancelItemCore;
+        private readonly Func<CancellationToken, Task> _runOverride;
 
         private readonly object _sync = new object();
+        private static readonly AsyncLocal<RunStateNotificationContext> s_runStateNotification = new();
+        private readonly TaskCompletionSource _disposalCompleted =
+            new(TaskCreationOptions.RunContinuationsAsynchronously);
         private readonly List<UploadQueueItem> _items = new List<UploadQueueItem>();
         private readonly HashSet<string> _knownFiles = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         private readonly SpeedEstimator _overallSpeed = new SpeedEstimator();
 
-        private CancellationTokenSource _runCancellation;
-        private Task _runTask;
+        private RunGeneration _generation;
         private bool _disposed;
+        private bool _disposalIsSynchronous;
+        private int _synchronousDisposeOwnerThreadId;
+        private int _lifecycleResourcesDisposed;
+
+        private sealed class RunGeneration
+        {
+            private int _cancellationDisposed;
+            private int _stopLifecycleRunning;
+            private readonly TaskCompletionSource _stopSignalCompleted =
+                new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public RunGeneration(CancellationTokenSource cancellation, Task runTask)
+            {
+                Cancellation = cancellation;
+                RunTask = runTask;
+                LifecycleTask = runTask;
+            }
+
+            public CancellationTokenSource Cancellation { get; }
+            public Task RunTask { get; }
+            public Task LifecycleTask { get; private set; }
+            public bool StopRequested { get; set; }
+            public bool PreserveParts { get; set; }
+            public bool IsRunning => StopRequested
+                ? Volatile.Read(ref _stopLifecycleRunning) != 0
+                : !RunTask.IsCompleted;
+
+            public static RunGeneration CreateSynthetic() =>
+                new(null, Task.CompletedTask);
+
+            public void LatchStop(bool preserveParts, Action publishTerminalState)
+            {
+                StopRequested = true;
+                PreserveParts = preserveParts;
+                Volatile.Write(ref _stopLifecycleRunning, 1);
+                LifecycleTask = CompleteStopLifecycleAsync(publishTerminalState);
+                _ = LifecycleTask.ContinueWith(
+                    task => { _ = task.Exception; },
+                    CancellationToken.None,
+                    TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+            }
+
+            private async Task CompleteStopLifecycleAsync(Action publishTerminalState)
+            {
+                try
+                {
+                    await Task.WhenAll(RunTask, _stopSignalCompleted.Task).ConfigureAwait(false);
+                }
+                finally
+                {
+                    // Keep LifecycleTask incomplete until subscribers have observed the terminal
+                    // state. Start cannot replace this generation while the callback is running.
+                    Volatile.Write(ref _stopLifecycleRunning, 0);
+                    publishTerminalState();
+                }
+            }
+
+            public void CompleteStopSignal() => _stopSignalCompleted.TrySetResult();
+
+            public void DisposeCancellation()
+            {
+                if (Interlocked.Exchange(ref _cancellationDisposed, 1) == 0)
+                    Cancellation?.Dispose();
+            }
+        }
+
+        private sealed class StopRequest
+        {
+            public StopRequest(
+                RunGeneration generation,
+                bool newlyLatched,
+                List<UploadQueueItem> queuedItems,
+                bool preserveParts)
+            {
+                Generation = generation;
+                NewlyLatched = newlyLatched;
+                QueuedItems = queuedItems;
+                PreserveParts = preserveParts;
+            }
+
+            public RunGeneration Generation { get; }
+            public bool NewlyLatched { get; }
+            public List<UploadQueueItem> QueuedItems { get; }
+            public bool PreserveParts { get; }
+        }
+
+        private sealed class RunStateNotificationContext
+        {
+            public RunStateNotificationContext(UploadQueueService queue, RunGeneration terminalGeneration)
+            {
+                Queue = queue;
+                TerminalGeneration = terminalGeneration;
+            }
+
+            public UploadQueueService Queue { get; }
+            public RunGeneration TerminalGeneration { get; }
+        }
 
         public UploadQueueService(ILoggingService log, UploadStateStore stateStore)
         {
             _log = log;
             _stateStore = stateStore;
             _uploadService = new R2UploadService(log, stateStore);
+        }
+
+        internal UploadQueueService(
+            ILoggingService log,
+            UploadStateStore stateStore,
+            Func<CancellationToken, Task> runOverride)
+            : this(log, stateStore)
+        {
+            _runOverride = runOverride;
         }
 
         public event EventHandler<QueueItemEventArgs> ItemAdded;
@@ -78,6 +190,7 @@ namespace CloudflareR2Uploader.Services
 
         public PauseController PauseController { get { return _pauseController; } }
         public R2UploadService UploadService { get { return _uploadService; } }
+        internal Task DisposalCompleted => _disposalCompleted.Task;
 
         /// <summary>Set by the form so the service can ask about overwrites on the UI thread.</summary>
         public IOverwritePrompt OverwritePrompt { get; set; }
@@ -90,8 +203,10 @@ namespace CloudflareR2Uploader.Services
         {
             get
             {
-                Task task = _runTask;
-                return task != null && !task.IsCompleted;
+                lock (_sync)
+                {
+                    return _generation != null && _generation.IsRunning;
+                }
             }
         }
 
@@ -101,6 +216,8 @@ namespace CloudflareR2Uploader.Services
         {
             lock (_sync) { return new List<UploadQueueItem>(_items); }
         }
+
+        IReadOnlyList<UploadQueueItem> IUploadQueueLifecycle.GetItems() => GetItems();
 
         public int Count { get { lock (_sync) { return _items.Count; } } }
 
@@ -292,6 +409,11 @@ namespace CloudflareR2Uploader.Services
 
         public void RetryItem(UploadQueueItem item)
         {
+            _retryItem(item);
+        }
+
+        private static void RetryItemCore(UploadQueueItem item)
+        {
             if (item == null) return;
             if (item.Status == UploadItemStatus.Failed ||
                 item.Status == UploadItemStatus.Cancelled ||
@@ -305,23 +427,48 @@ namespace CloudflareR2Uploader.Services
 
         /// <summary>
         /// Starts uploading. Returns the running task so callers can await completion; the UI
-        /// never blocks on it.
+        /// never blocks on it. A reentrant call from the terminal <see cref="RunStateChanged"/>
+        /// notification may start the next generation immediately; unrelated callers remain
+        /// gated on the terminating generation until that notification returns.
         /// </summary>
         public Task StartAsync()
         {
+            RunGeneration completedGeneration;
+            Task runTask;
+            TaskCompletionSource launch = new(TaskCreationOptions.RunContinuationsAsynchronously);
             lock (_sync)
             {
-                if (_runTask != null && !_runTask.IsCompleted) return _runTask;
+                ObjectDisposedException.ThrowIf(_disposed, this);
+                if (_generation != null &&
+                    !_generation.LifecycleTask.IsCompleted &&
+                    !CanRestartFromTerminalNotificationLocked(_generation))
+                {
+                    return _generation.LifecycleTask;
+                }
 
-                if (_runCancellation != null) _runCancellation.Dispose();
-                _runCancellation = new CancellationTokenSource();
+                completedGeneration = _generation;
+                CancellationTokenSource cancellation = new CancellationTokenSource();
+                CancellationToken runToken = cancellation.Token;
 
-                _pauseController.Resume();
-                _runTask = Task.Run(() => RunAsync(_runCancellation.Token));
+                runTask = Task.Run(async () =>
+                {
+                    await launch.Task.ConfigureAwait(false);
+                    await (_runOverride != null
+                        ? _runOverride(runToken)
+                        : RunAsync(runToken)).ConfigureAwait(false);
+                });
+                _generation = new RunGeneration(cancellation, runTask);
             }
 
+            ReleaseGenerationAfterLifecycle(completedGeneration);
+            try { _pauseController.Resume(); }
+            catch (Exception ex)
+            {
+                TryLogError("Queue.Callback", "A pause-state subscriber failed while starting upload.", ex);
+            }
+            finally { launch.TrySetResult(); }
             RaiseRunStateChanged();
-            return _runTask;
+            return runTask;
         }
 
         public void Pause()
@@ -373,32 +520,147 @@ namespace CloudflareR2Uploader.Services
         /// <summary>Cancels the whole run. <paramref name="preserveParts"/> keeps multipart state.</summary>
         public void CancelAll(bool preserveParts)
         {
-            foreach (UploadQueueItem item in GetItems())
+            StopRequest request = CreateStopRequest(preserveParts);
+            if (request != null) ScheduleSignalStop(request);
+        }
+
+        /// <summary>
+        /// Stops the current generation and waits for its complete cleanup lifecycle. A reentrant
+        /// call from that generation's terminal <see cref="RunStateChanged"/> notification is an
+        /// idempotent completed no-op, so a subscriber never waits on its own callback.
+        /// </summary>
+        public Task StopAsync(bool preserveParts, CancellationToken cancellationToken)
+        {
+            StopRequest request = CreateStopRequest(preserveParts);
+            if (request == null) return Task.CompletedTask;
+            ScheduleSignalStop(request);
+            return request.Generation.LifecycleTask.WaitAsync(cancellationToken);
+        }
+
+        private StopRequest CreateStopRequest(bool preserveParts)
+        {
+            lock (_sync)
+            {
+                if (IsTerminalNotificationForCurrentGenerationLocked()) return null;
+
+                // Disposal is terminal. While its active lifecycle is still open, callers may
+                // join that exact stop; after it completes, cancellation APIs are safe no-ops.
+                if (_disposed)
+                {
+                    if (_generation == null || _generation.LifecycleTask.IsCompleted)
+                        return null;
+                    return new StopRequest(
+                        _generation,
+                        false,
+                        null,
+                        _generation.PreserveParts);
+                }
+
+                return CreateStopRequestLocked(preserveParts);
+            }
+        }
+
+        private StopRequest CreateStopRequestLocked(bool preserveParts)
+        {
+            RunGeneration generation = _generation;
+            if (generation == null)
+            {
+                generation = RunGeneration.CreateSynthetic();
+                _generation = generation;
+            }
+
+            if (generation.StopRequested)
+                return new StopRequest(generation, false, null, generation.PreserveParts);
+
+            generation.LatchStop(preserveParts, () => RaiseRunStateChanged(generation));
+            List<UploadQueueItem> queuedItems = new List<UploadQueueItem>();
+            foreach (UploadQueueItem item in _items)
             {
                 item.PreservePartsOnCancel = preserveParts;
+                if (item.Status == UploadItemStatus.Queued) queuedItems.Add(item);
             }
 
-            _pauseController.Resume();   // never leave a cancelled run parked at the pause gate
+            return new StopRequest(generation, true, queuedItems, preserveParts);
+        }
 
-            CancellationTokenSource source;
-            lock (_sync) { source = _runCancellation; }
-
-            if (source != null)
+        private void ScheduleSignalStop(StopRequest request)
+        {
+            if (!request.NewlyLatched) return;
+            try
             {
-                try { source.Cancel(); }
+                _ = Task.Factory.StartNew(
+                    () => SignalStop(request),
+                    CancellationToken.None,
+                    TaskCreationOptions.DenyChildAttach,
+                    TaskScheduler.Default);
+            }
+            catch (Exception ex)
+            {
+                TryLogError("Queue.Cancel", "Upload cancellation signaling could not be scheduled.", ex);
+                request.Generation.CompleteStopSignal();
+            }
+        }
+
+        // Queue notifications have historically been raised from queue worker threads. Stop
+        // signaling follows that same contract so UI callers can apply their own timeout while
+        // cancellation callbacks and status subscribers finish.
+        private void SignalStop(StopRequest request)
+        {
+            try
+            {
+                try { _pauseController.Resume(); }
                 catch (ObjectDisposedException) { }
-            }
+                catch (Exception ex)
+                {
+                    TryLogError("Queue.Callback", "A pause-state subscriber failed while stopping upload.", ex);
+                }
 
-            foreach (UploadQueueItem item in GetItems())
+                if (request.Generation.Cancellation != null)
+                {
+                    try { request.Generation.Cancellation.Cancel(); }
+                    catch (ObjectDisposedException) { }
+                    catch (Exception ex)
+                    {
+                        TryLogError("Queue.Cancel", "Upload cancellation callbacks failed.", ex);
+                    }
+                }
+
+                if (request.QueuedItems != null)
+                {
+                    foreach (UploadQueueItem item in request.QueuedItems)
+                    {
+                        try { item.SetStatus(UploadItemStatus.Cancelled); }
+                        catch (Exception ex)
+                        {
+                            TryLogError("Queue.Callback", "A queue-item subscriber failed while stopping upload.", ex);
+                        }
+                    }
+                }
+
+                try
+                {
+                    if (_log != null)
+                        _log.Info("Queue.Cancel", "Upload cancelled (preserveParts=" + request.PreserveParts + ").");
+                }
+                catch (Exception ex) { TryLogError("Queue.Callback", "Upload cancellation logging failed.", ex); }
+                RaiseRunStateChanged();
+            }
+            catch (Exception ex)
             {
-                if (item.Status == UploadItemStatus.Queued) item.SetStatus(UploadItemStatus.Cancelled);
+                TryLogError("Queue.Cancel", "Upload cancellation signaling failed unexpectedly.", ex);
             }
-
-            if (_log != null) _log.Info("Queue.Cancel", "Upload cancelled (preserveParts=" + preserveParts + ").");
-            RaiseRunStateChanged();
+            finally
+            {
+                request.Generation.CompleteStopSignal();
+            }
         }
 
         public void CancelItem(UploadQueueItem item)
+        {
+            _cancelItem(item);
+        }
+
+        private static void CancelItemCore(UploadQueueItem item)
         {
             if (item == null) return;
 
@@ -577,30 +839,204 @@ namespace CloudflareR2Uploader.Services
             if (handler != null) handler(this, new UploadFinishedEventArgs(item, result));
         }
 
+        private bool CanRestartFromTerminalNotificationLocked(RunGeneration generation)
+        {
+            RunStateNotificationContext notification = s_runStateNotification.Value;
+            return notification != null &&
+                ReferenceEquals(notification.Queue, this) &&
+                ReferenceEquals(notification.TerminalGeneration, generation) &&
+                generation.StopRequested &&
+                !generation.IsRunning;
+        }
+
+        private bool IsTerminalNotificationForCurrentGenerationLocked()
+        {
+            return _generation != null && CanRestartFromTerminalNotificationLocked(_generation);
+        }
+
         private void RaiseRunStateChanged()
         {
+            RaiseRunStateChanged(null);
+        }
+
+        private void RaiseRunStateChanged(RunGeneration terminalGeneration)
+        {
             EventHandler handler = RunStateChanged;
-            if (handler != null) handler(this, EventArgs.Empty);
+            if (handler == null) return;
+
+            RunStateNotificationContext previous = s_runStateNotification.Value;
+            s_runStateNotification.Value = terminalGeneration == null
+                ? null
+                : new RunStateNotificationContext(this, terminalGeneration);
+            try
+            {
+                foreach (EventHandler callback in handler.GetInvocationList())
+                {
+                    try { callback(this, EventArgs.Empty); }
+                    catch (Exception ex)
+                    {
+                        TryLogError("Queue.Callback", "A run-state subscriber failed.", ex);
+                    }
+                }
+            }
+            finally
+            {
+                s_runStateNotification.Value = previous;
+            }
         }
 
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
-
-            try { CancelAll(true); }
-            catch (ObjectDisposedException) { }
-
+            StopRequest stopRequest = null;
+            RunGeneration generation = null;
+            Task duplicateDisposal = null;
             lock (_sync)
             {
-                if (_runCancellation != null)
+                if (_disposed)
                 {
-                    _runCancellation.Dispose();
-                    _runCancellation = null;
+                    // A logging callback may reenter Dispose on the synchronous owner thread.
+                    // Other duplicate idle/completed callers join its inline cleanup.
+                    if (_disposalIsSynchronous &&
+                        _synchronousDisposeOwnerThreadId != Environment.CurrentManagedThreadId)
+                    {
+                        duplicateDisposal = _disposalCompleted.Task;
+                    }
+                    else
+                    {
+                        return;
+                    }
+                }
+                else
+                {
+                    _disposed = true;
+                    generation = _generation;
+                    _disposalIsSynchronous =
+                        generation == null || generation.LifecycleTask.IsCompleted;
+                    if (_disposalIsSynchronous)
+                        _synchronousDisposeOwnerThreadId = Environment.CurrentManagedThreadId;
+
+                    // Only an open lifecycle needs cancellation. Idle queues and completed runs
+                    // release synchronously without manufacturing another stop generation.
+                    if (!_disposalIsSynchronous)
+                        stopRequest = CreateStopRequestLocked(true);
                 }
             }
 
-            _pauseController.Dispose();
+            if (duplicateDisposal != null)
+            {
+                duplicateDisposal.GetAwaiter().GetResult();
+                return;
+            }
+
+            if (stopRequest != null) ScheduleSignalStop(stopRequest);
+
+            if (generation != null && !generation.LifecycleTask.IsCompleted)
+            {
+                _ = generation.LifecycleTask.ContinueWith(
+                    _ => CompleteDisposal(generation),
+                    CancellationToken.None,
+                    TaskContinuationOptions.ExecuteSynchronously,
+                    TaskScheduler.Default);
+                return;
+            }
+
+            CompleteDisposal(generation);
+        }
+
+        private void ReleaseGenerationAfterLifecycle(RunGeneration generation)
+        {
+            if (generation == null) return;
+            if (generation.LifecycleTask.IsCompleted)
+            {
+                ReleaseCompletedGeneration(generation);
+                return;
+            }
+
+            _ = generation.LifecycleTask.ContinueWith(
+                _ => ReleaseCompletedGeneration(generation),
+                CancellationToken.None,
+                TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        private void ReleaseCompletedGeneration(RunGeneration generation)
+        {
+            if (generation == null) return;
+
+            ObserveGenerationFault(generation, "Queue.Run", "The previous upload run faulted before restart.");
+            try { generation.DisposeCancellation(); }
+            catch (Exception ex)
+            {
+                TryLogError("Queue.Run", "The previous upload cancellation source could not be disposed.", ex);
+            }
+        }
+
+        private void CompleteDisposal(RunGeneration generation)
+        {
+            try
+            {
+                if (Interlocked.Exchange(ref _lifecycleResourcesDisposed, 1) != 0) return;
+
+                ObserveGenerationFault(
+                    generation,
+                    "Queue.Dispose",
+                    "The upload run faulted during shutdown cleanup.");
+
+                try
+                {
+                    if (generation != null) generation.DisposeCancellation();
+                }
+                catch (Exception ex)
+                {
+                    TryLogError("Queue.Dispose", "The upload cancellation source could not be disposed.", ex);
+                }
+
+                try { _pauseController.Dispose(); }
+                catch (Exception ex)
+                {
+                    TryLogError("Queue.Dispose", "The upload pause controller could not be disposed.", ex);
+                }
+            }
+            catch (Exception ex)
+            {
+                TryLogError("Queue.Dispose", "Upload shutdown cleanup failed unexpectedly.", ex);
+            }
+            finally
+            {
+                _disposalCompleted.TrySetResult();
+            }
+        }
+
+        private void ObserveRunFault(Task runTask, string operation, string message)
+        {
+            if (runTask == null || !runTask.IsFaulted) return;
+
+            Exception error = runTask.Exception;
+            if (error is AggregateException aggregate && aggregate.InnerExceptions.Count == 1)
+                error = aggregate.InnerExceptions[0];
+            TryLogError(operation, message, error);
+        }
+
+        private void ObserveGenerationFault(RunGeneration generation, string operation, string message)
+        {
+            if (generation == null) return;
+
+            // Inspect the composite explicitly, then report the exact runner fault once.
+            if (generation.LifecycleTask.IsFaulted)
+                _ = generation.LifecycleTask.Exception;
+            ObserveRunFault(generation.RunTask, operation, message);
+        }
+
+        private void TryLogError(string operation, string message, Exception exception)
+        {
+            try
+            {
+                if (_log != null) _log.Error(operation, message, exception);
+            }
+            catch (Exception)
+            {
+                // Logging must never fault a shutdown continuation and become unobserved itself.
+            }
         }
     }
 }

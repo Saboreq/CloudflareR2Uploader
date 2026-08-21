@@ -21,8 +21,7 @@
   <application xmlns="urn:schemas-microsoft-com:asm.v3">
     <windowsSettings>
       <!--
-        Per-Monitor V2, unlike the WinForms build which could only declare system
-        awareness. WPF on .NET 10 rescales correctly when a window moves between monitors
+        Per-Monitor V2 lets WPF on .NET 10 rescale correctly when a window moves between monitors
         with different scale factors, and PerMonitorV2 additionally gives DPI-scaled
         non-client area, dialogs and tooltips.
       -->

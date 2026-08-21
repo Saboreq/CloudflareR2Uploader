@@ -16,11 +16,11 @@ namespace CloudflareR2Uploader.Services
 
         public PresignedUrlResult Create(AppSettings settings, R2Credentials credentials, string objectKey, TimeSpan expiration)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
-            if (credentials == null) throw new ArgumentNullException("credentials");
-            if (string.IsNullOrEmpty(objectKey)) throw new ArgumentException("An exact object key is required.", "objectKey");
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(credentials);
+            if (string.IsNullOrEmpty(objectKey)) throw new ArgumentException("An exact object key is required.", nameof(objectKey));
             if (expiration < PresignedUrlOptions.MinimumExpiration || expiration > PresignedUrlOptions.MaximumExpiration)
-                throw new ArgumentOutOfRangeException("expiration", "Expiration must be between one second and seven days.");
+                throw new ArgumentOutOfRangeException(nameof(expiration), "Expiration must be between one second and seven days.");
 
             DateTime expiresUtc = _clock.UtcNow.Add(expiration);
             using (AmazonS3Client client = R2ClientFactory.CreateClient(settings, credentials))

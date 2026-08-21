@@ -1,0 +1,26 @@
+<Project>
+
+  <!-- Shared SDK-style MSBuild defaults for Cloudflare R2 Uploader projects. -->
+
+  <PropertyGroup>
+    <LangVersion>latest</LangVersion>
+
+    <Nullable>disable</Nullable>
+
+    <ImplicitUsings>disable</ImplicitUsings>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Deterministic>true</Deterministic>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <EnableNETAnalyzers>true</EnableNETAnalyzers>
+    <AnalysisLevel>latest-minimum</AnalysisLevel>
+    <NeutralLanguage>en</NeutralLanguage>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+    <Company>Saboreq</Company>
+    <Product>Cloudflare R2 Uploader</Product>
+    <Version>1.0.0</Version>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <FileVersion>1.0.0.0</FileVersion>
+    <InformationalVersion>1.0.0</InformationalVersion>
+  </PropertyGroup>
+
+</Project>

@@ -7,45 +7,63 @@ namespace CloudflareR2Uploader.Services
     internal sealed class SemanticVersion : IComparable<SemanticVersion>
     {
         private static readonly Regex Pattern = new Regex(
-            @"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?$",
+            @"^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?![\s\S])",
             RegexOptions.Compiled | RegexOptions.CultureInvariant);
 
-        private SemanticVersion(int major, int minor, int patch, string prerelease)
+        private readonly string _major;
+        private readonly string _minor;
+        private readonly string _patch;
+
+        private SemanticVersion(string major, string minor, string patch, string prerelease)
         {
-            Major = major;
-            Minor = minor;
-            Patch = patch;
+            _major = major;
+            _minor = minor;
+            _patch = patch;
             Prerelease = prerelease ?? string.Empty;
         }
 
-        public int Major { get; private set; }
-        public int Minor { get; private set; }
-        public int Patch { get; private set; }
         public string Prerelease { get; private set; }
 
         public static bool TryParse(string value, out SemanticVersion version)
         {
             version = null;
-            Match match = Pattern.Match((value ?? string.Empty).Trim());
+            Match match = Pattern.Match(value ?? string.Empty);
             if (!match.Success) return false;
-            int major;
-            int minor;
-            int patch;
-            if (!int.TryParse(match.Groups[1].Value, NumberStyles.None, CultureInfo.InvariantCulture, out major) ||
-                !int.TryParse(match.Groups[2].Value, NumberStyles.None, CultureInfo.InvariantCulture, out minor) ||
-                !int.TryParse(match.Groups[3].Value, NumberStyles.None, CultureInfo.InvariantCulture, out patch)) return false;
-            version = new SemanticVersion(major, minor, patch, match.Groups[4].Value);
+
+            string prerelease = match.Groups[4].Value;
+            if (prerelease.Length > 0)
+            {
+                foreach (string identifier in prerelease.Split('.'))
+                {
+                    if (identifier.Length > 1 && identifier[0] == '0' && IsNumeric(identifier))
+                        return false;
+                }
+            }
+
+            version = new SemanticVersion(
+                match.Groups[1].Value,
+                match.Groups[2].Value,
+                match.Groups[3].Value,
+                prerelease);
             return true;
+        }
+
+        public bool TryGetFileVersion(out int major, out int minor, out int patch)
+        {
+            bool validMajor = TryGetFileVersionComponent(_major, out major);
+            bool validMinor = TryGetFileVersionComponent(_minor, out minor);
+            bool validPatch = TryGetFileVersionComponent(_patch, out patch);
+            return validMajor && validMinor && validPatch;
         }
 
         public int CompareTo(SemanticVersion other)
         {
             if (other == null) return 1;
-            int result = Major.CompareTo(other.Major);
+            int result = CompareNumeric(_major, other._major);
             if (result != 0) return result;
-            result = Minor.CompareTo(other.Minor);
+            result = CompareNumeric(_minor, other._minor);
             if (result != 0) return result;
-            result = Patch.CompareTo(other.Patch);
+            result = CompareNumeric(_patch, other._patch);
             if (result != 0) return result;
             bool thisRelease = Prerelease.Length == 0;
             bool otherRelease = other.Prerelease.Length == 0;
@@ -56,16 +74,40 @@ namespace CloudflareR2Uploader.Services
             int count = Math.Min(left.Length, right.Length);
             for (int i = 0; i < count; i++)
             {
-                long leftNumber;
-                long rightNumber;
-                bool leftNumeric = long.TryParse(left[i], NumberStyles.None, CultureInfo.InvariantCulture, out leftNumber);
-                bool rightNumeric = long.TryParse(right[i], NumberStyles.None, CultureInfo.InvariantCulture, out rightNumber);
-                if (leftNumeric && rightNumeric) result = leftNumber.CompareTo(rightNumber);
+                bool leftNumeric = IsNumeric(left[i]);
+                bool rightNumeric = IsNumeric(right[i]);
+                if (leftNumeric && rightNumeric) result = CompareNumeric(left[i], right[i]);
                 else if (leftNumeric != rightNumeric) result = leftNumeric ? -1 : 1;
                 else result = string.CompareOrdinal(left[i], right[i]);
                 if (result != 0) return result;
             }
             return left.Length.CompareTo(right.Length);
+        }
+
+        private static int CompareNumeric(string left, string right)
+        {
+            int length = left.Length.CompareTo(right.Length);
+            return length != 0 ? length : string.CompareOrdinal(left, right);
+        }
+
+        private static bool IsNumeric(string value)
+        {
+            for (int index = 0; index < value.Length; index++)
+            {
+                if (value[index] < '0' || value[index] > '9') return false;
+            }
+
+            return value.Length > 0;
+        }
+
+        private static bool TryGetFileVersionComponent(string value, out int component)
+        {
+            return int.TryParse(
+                    value,
+                    NumberStyles.None,
+                    CultureInfo.InvariantCulture,
+                    out component) &&
+                component <= ushort.MaxValue;
         }
     }
 }

@@ -1,5 +1,4 @@
 using System;
-using System.Net;
 using Amazon.Runtime;
 using Amazon.S3;
 using CloudflareR2Uploader.Models;
@@ -29,33 +28,12 @@ namespace CloudflareR2Uploader.Services
         private static readonly TimeSpan RequestTimeout = TimeSpan.FromMinutes(20);
 
         /// <summary>
-        /// Ensures modern TLS is enabled. .NET Framework 4.8 defaults to the OS setting, but
-        /// being explicit avoids handshake failures on machines with an old registry policy.
-        /// Called once at startup; it is a process-wide setting.
+        /// Retained as a compatibility hook for existing startup code. .NET 10's
+        /// <c>HttpClient</c>-based AWS transport negotiates TLS from the operating-system
+        /// defaults and is not affected by <c>ServicePointManager</c> settings.
         /// </summary>
         public static void ConfigureTransportSecurity()
         {
-            try
-            {
-                SecurityProtocolType desired = SecurityProtocolType.Tls12;
-
-                // Tls13 exists in .NET Framework 4.8 but is not a compile-time constant on all
-                // servicing levels, so it is added by value when the OS supports it.
-                const SecurityProtocolType Tls13 = (SecurityProtocolType)12288;
-                if (Enum.IsDefined(typeof(SecurityProtocolType), Tls13)) desired |= Tls13;
-
-                ServicePointManager.SecurityProtocol |= desired;
-
-                // R2 uploads several parts at once over the same host.
-                if (ServicePointManager.DefaultConnectionLimit < 32)
-                    ServicePointManager.DefaultConnectionLimit = 32;
-
-                ServicePointManager.Expect100Continue = false;
-            }
-            catch (NotSupportedException)
-            {
-                // Leave the platform default in place if the value is rejected.
-            }
         }
 
         /// <summary>
@@ -64,7 +42,7 @@ namespace CloudflareR2Uploader.Services
         /// </summary>
         public static AmazonS3Config CreateConfig(AppSettings settings)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
+            ArgumentNullException.ThrowIfNull(settings);
 
             string serviceUrl = settings.ResolveServiceUrl();
             if (string.IsNullOrEmpty(serviceUrl))
@@ -101,8 +79,8 @@ namespace CloudflareR2Uploader.Services
         /// <summary>Creates a client. The caller owns it and must dispose it.</summary>
         public static AmazonS3Client CreateClient(AppSettings settings, R2Credentials credentials)
         {
-            if (settings == null) throw new ArgumentNullException("settings");
-            if (credentials == null) throw new ArgumentNullException("credentials");
+            ArgumentNullException.ThrowIfNull(settings);
+            ArgumentNullException.ThrowIfNull(credentials);
 
             if (!credentials.IsComplete)
                 throw new InvalidOperationException("The R2 Access Key ID and Secret Access Key are both required.");

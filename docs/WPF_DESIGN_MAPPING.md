@@ -186,7 +186,7 @@ Component reference for the resource dictionaries:
 * `KeyboardNavigation.TabNavigation=Cycle` on dialogs traps focus; `IsDefault`/`IsCancel`
   give Enter/Escape; `ContextMenu` opens with the Menu key or Shift+F10 at the focused row.
 
-## 5. Keyboard map preserved from the WinForms build
+## 5. Keyboard map
 
 | Key | Action | View model member |
 | --- | --- | --- |

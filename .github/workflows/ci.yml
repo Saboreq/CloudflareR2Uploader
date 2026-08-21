@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
   pull_request:
   workflow_dispatch:
 
@@ -18,34 +19,33 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v6
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.x
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --version=6.7.1 --no-progress -y
       - name: Restore, build, test, and package
         shell: pwsh
         env:
           BUILD_VERSION: 0.0.0-ci.${{ github.run_number }}
-          UPDATE_BASE_URL: ${{ vars.UPDATE_BASE_URL }}
-          UPDATE_PREFIX: ${{ vars.UPDATE_PREFIX }}
         run: |
           $parameters = @{ Version = $env:BUILD_VERSION }
-          if ($env:UPDATE_BASE_URL) { $parameters.UpdateBaseUrl = $env:UPDATE_BASE_URL }
-          if ($env:UPDATE_PREFIX) { $parameters.UpdatePrefix = $env:UPDATE_PREFIX }
           & .\build\Build-Release.ps1 @parameters
+      - name: Test release-script security contracts
+        shell: pwsh
+        run: .\tests\PowerShell\Test-UpdateReleaseScripts.ps1
       - name: Upload release package
         if: success()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: cloudflare-r2-uploader-windows
           path: dist/CloudflareR2Uploader-v*-Setup.exe
           if-no-files-found: error
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-results
           path: TestResults/**/*.trx

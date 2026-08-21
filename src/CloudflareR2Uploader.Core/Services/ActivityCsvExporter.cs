@@ -36,7 +36,7 @@ namespace CloudflareR2Uploader.Services
 
         public static string Export(IEnumerable<ActivityRecord> records)
         {
-            if (records is null) throw new ArgumentNullException(nameof(records));
+            ArgumentNullException.ThrowIfNull(records);
 
             StringBuilder builder = new StringBuilder();
             AppendRow(builder, Header);
@@ -63,9 +63,9 @@ namespace CloudflareR2Uploader.Services
             return builder.ToString();
         }
 
-        private static void AppendRow(StringBuilder builder, IReadOnlyList<string> values)
+        private static void AppendRow(StringBuilder builder, string[] values)
         {
-            for (int index = 0; index < values.Count; index++)
+            for (int index = 0; index < values.Length; index++)
             {
                 if (index > 0) builder.Append(',');
                 builder.Append(EscapeField(values[index]));
@@ -84,10 +84,10 @@ namespace CloudflareR2Uploader.Services
             if (text[0] == '=' || text[0] == '+' || text[0] == '-' || text[0] == '@') text = "'" + text;
 
             bool mustQuote =
-                text.IndexOf(',') >= 0 ||
-                text.IndexOf('"') >= 0 ||
-                text.IndexOf('\n') >= 0 ||
-                text.IndexOf('\r') >= 0 ||
+                text.Contains(',') ||
+                text.Contains('"') ||
+                text.Contains('\n') ||
+                text.Contains('\r') ||
                 text[0] == ' ' ||
                 text[text.Length - 1] == ' ';
 

@@ -17,23 +17,38 @@ jobs:
     runs-on: windows-latest
     timeout-minutes: 35
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
         with:
           fetch-depth: 0
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           dotnet-version: 10.0.x
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --version=6.7.1 --no-progress -y
       - name: Validate tag and derive version
         id: version
         shell: pwsh
         env:
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          if ($env:RELEASE_TAG -notmatch '^v(?<version>(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?)$') {
+          $publishableSemanticVersionPattern = '^v(?<version>(?<major>0|[1-9][0-9]*)\.(?<minor>0|[1-9][0-9]*)\.(?<patch>0|[1-9][0-9]*)(?:-(?:(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*)(?:\.(?:0|[1-9][0-9]*|[0-9A-Za-z-]*[A-Za-z-][0-9A-Za-z-]*))*))?)(?![\s\S])'
+          $releaseVersionCandidate = if ($null -ne $env:RELEASE_TAG -and $env:RELEASE_TAG.StartsWith('v', [StringComparison]::Ordinal)) {
+            $env:RELEASE_TAG.Substring(1)
+          } else {
+            $null
+          }
+          if ($null -eq $releaseVersionCandidate -or $releaseVersionCandidate.Length -gt 128 -or
+              $env:RELEASE_TAG -notmatch $publishableSemanticVersionPattern) {
             throw "Unsupported release tag: $env:RELEASE_TAG"
+          }
+          $versionMajor = [uint16]0
+          $versionMinor = [uint16]0
+          $versionPatch = [uint16]0
+          if (-not [uint16]::TryParse($Matches.major, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionMajor) -or
+              -not [uint16]::TryParse($Matches.minor, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionMinor) -or
+              -not [uint16]::TryParse($Matches.patch, [Globalization.NumberStyles]::None, [Globalization.CultureInfo]::InvariantCulture, [ref]$versionPatch)) {
+            throw "Release tag cannot be represented by Windows file-version metadata: $env:RELEASE_TAG"
           }
           "version=$($Matches.version)" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
           "prerelease=$($Matches.version.Contains('-').ToString().ToLowerInvariant())" | Out-File -FilePath $env:GITHUB_OUTPUT -Append -Encoding utf8
@@ -42,12 +57,23 @@ jobs:
         env:
           RELEASE_VERSION: ${{ steps.version.outputs.version }}
           UPDATE_BASE_URL: ${{ vars.UPDATE_BASE_URL }}
+          UPDATE_MANIFEST_PUBLIC_KEY: ${{ vars.UPDATE_MANIFEST_PUBLIC_KEY }}
           UPDATE_PREFIX: ${{ vars.UPDATE_PREFIX }}
         run: |
-          $parameters = @{ Version = $env:RELEASE_VERSION }
-          if ($env:UPDATE_BASE_URL) { $parameters.UpdateBaseUrl = $env:UPDATE_BASE_URL }
-          if ($env:UPDATE_PREFIX) { $parameters.UpdatePrefix = $env:UPDATE_PREFIX }
+          if ([string]::IsNullOrWhiteSpace($env:UPDATE_BASE_URL) -or [string]::IsNullOrWhiteSpace($env:UPDATE_MANIFEST_PUBLIC_KEY)) {
+            throw 'Tagged releases require UPDATE_BASE_URL and UPDATE_MANIFEST_PUBLIC_KEY repository variables.'
+          }
+          $parameters = @{
+            Version = $env:RELEASE_VERSION
+            UpdateBaseUrl = $env:UPDATE_BASE_URL.Trim()
+            UpdateManifestPublicKey = $env:UPDATE_MANIFEST_PUBLIC_KEY.Trim()
+            RequireSignedUpdate = $true
+          }
+          if ($env:UPDATE_PREFIX) { $parameters.UpdatePrefix = $env:UPDATE_PREFIX.Trim() }
           & .\build\Build-Release.ps1 @parameters
+      - name: Test release-script security contracts
+        shell: pwsh
+        run: .\tests\PowerShell\Test-UpdateReleaseScripts.ps1
       - name: Create GitHub Release
         shell: pwsh
         env:

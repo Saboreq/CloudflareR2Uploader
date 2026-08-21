@@ -30,6 +30,7 @@ namespace CloudflareR2Uploader.Wpf.Services
         private readonly SingleInstanceCoordinator _singleInstance;
         private readonly IApplicationExitCoordinator _exitCoordinator;
         private readonly UpdateService _updates;
+        private readonly ApplicationWindowCloseRouter _closeRouter = new();
 
         private Forms.NotifyIcon? _icon;
         private Forms.ToolStripMenuItem? _openItem;
@@ -39,7 +40,6 @@ namespace CloudflareR2Uploader.Wpf.Services
         private Forms.ToolStripMenuItem? _pauseItem;
         private Forms.ToolStripMenuItem? _startupItem;
         private bool _started;
-        private bool _exiting;
         private bool _shownCloseNotice;
         private bool _updateCheckInProgress;
         private bool _updateAvailable;
@@ -115,8 +115,8 @@ namespace CloudflareR2Uploader.Wpf.Services
             _exitCoordinator.ExitCommitted += OnExitCommitted;
             _singleInstance.StartListening();
 
-            string? updateManifest = UpdateService.LoadManifestUrl(AppContext.BaseDirectory);
-            if (!string.IsNullOrEmpty(updateManifest))
+            Models.UpdateSourceConfiguration? updateSource = UpdateService.LoadUpdateSource(AppContext.BaseDirectory);
+            if (updateSource is not null)
             {
                 _updateTimer = new DispatcherTimer(DispatcherPriority.Background)
                 {
@@ -146,9 +146,12 @@ namespace CloudflareR2Uploader.Wpf.Services
 
         private bool HandleWindowClose()
         {
-            if (_exiting) return true;
+            WindowCloseDisposition disposition = _closeRouter.Evaluate(
+                _session.Settings.CloseToTray,
+                _queue.IsRunning);
+            if (disposition == WindowCloseDisposition.AllowClose) return true;
 
-            if (_session.Settings.CloseToTray || _queue.IsRunning)
+            if (disposition == WindowCloseDisposition.Hide)
             {
                 if (!_shownCloseNotice && _session.Settings.ShowTrayNotifications)
                 {
@@ -163,8 +166,10 @@ namespace CloudflareR2Uploader.Wpf.Services
                 return false;
             }
 
-            _exiting = true;
-            return true;
+            _window.Dispatcher.BeginInvoke(
+                DispatcherPriority.Normal,
+                new Action(async () => await ExitAsync().ConfigureAwait(true)));
+            return false;
         }
 
         private void OnWindowStateChanged(object? sender, EventArgs e)
@@ -194,14 +199,14 @@ namespace CloudflareR2Uploader.Wpf.Services
             _updateTimer?.Stop();
             if (!_session.Settings.CheckForUpdatesAutomatically || _updateCheckInProgress) return;
 
-            string? manifestUrl = UpdateService.LoadManifestUrl(AppContext.BaseDirectory);
-            if (string.IsNullOrEmpty(manifestUrl)) return;
+            Models.UpdateSourceConfiguration? updateSource = UpdateService.LoadUpdateSource(AppContext.BaseDirectory);
+            if (updateSource is null) return;
 
             _updateCheckInProgress = true;
             try
             {
                 Models.UpdateCheckResult result = await _updates
-                    .CheckAsync(manifestUrl, ApplicationInfo.DisplayVersion, CancellationToken.None)
+                    .CheckAsync(updateSource, ApplicationInfo.DisplayVersion, CancellationToken.None)
                     .ConfigureAwait(true);
                 _updateAvailable = result.IsUpdateAvailable;
                 if (_updateAvailable && _session.Settings.NotifyOnUpdateAvailable)
@@ -225,8 +230,6 @@ namespace CloudflareR2Uploader.Wpf.Services
 
         private async Task ExitAsync()
         {
-            if (_exiting) return;
-
             if (!await _exitCoordinator.PrepareAsync().ConfigureAwait(true)) return;
 
             _exitCoordinator.Commit();
@@ -247,7 +250,7 @@ namespace CloudflareR2Uploader.Wpf.Services
 
         private void OnExitCommitted(object? sender, EventArgs e)
         {
-            _exiting = true;
+            _closeRouter.MarkExitCommitted();
             if (_icon is not null) _icon.Visible = false;
         }
 
@@ -274,7 +277,7 @@ namespace CloudflareR2Uploader.Wpf.Services
 
         private void OnWindowClosed(object? sender, EventArgs e)
         {
-            if (!_exiting) _exiting = true;
+            if (!_closeRouter.ShouldShutdownAfterClosed) return;
             if (_icon is not null) _icon.Visible = false;
             Application.Current.Shutdown();
         }

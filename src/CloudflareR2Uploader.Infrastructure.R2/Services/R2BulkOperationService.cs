@@ -18,17 +18,44 @@ namespace CloudflareR2Uploader.Services
         Task<BulkDeleteBatchResult> DeleteAsync(AppSettings settings, R2Credentials credentials, IList<string> keys, CancellationToken cancellationToken);
     }
 
+    internal enum DownloadCommitStage
+    {
+        Copied = 0,
+        AsyncFlushed = 1,
+        LengthValidated = 2,
+        TimestampApplied = 3,
+        DurablyFlushed = 4
+    }
+
     public sealed class R2BulkOperationService
     {
         public const int DefaultDownloadConcurrency = 3;
+        private const int MaxLocalCollisionRetries = 999;
         private readonly IR2BulkObjectSource _source;
         private readonly ILoggingService _log;
+        private readonly Func<DownloadCommitStage, CancellationToken, Task> _finalCopyBoundary;
+        private readonly Func<string, IDownloadCommit> _commitFactory;
 
         public R2BulkOperationService(ILoggingService log) : this(log, new AwsBulkObjectSource()) { }
-        internal R2BulkOperationService(ILoggingService log, IR2BulkObjectSource source)
+        internal R2BulkOperationService(ILoggingService log, IR2BulkObjectSource source) : this(log, source, null, null) { }
+        internal R2BulkOperationService(
+            ILoggingService log,
+            IR2BulkObjectSource source,
+            Func<DownloadCommitStage, CancellationToken, Task> finalCopyBoundary)
+            : this(log, source, finalCopyBoundary, null)
         {
+        }
+        internal R2BulkOperationService(
+            ILoggingService log,
+            IR2BulkObjectSource source,
+            Func<DownloadCommitStage, CancellationToken, Task> finalCopyBoundary,
+            Func<string, IDownloadCommit> commitFactory)
+        {
+            ArgumentNullException.ThrowIfNull(source);
             _log = log;
-            _source = source ?? throw new ArgumentNullException("source");
+            _source = source;
+            _finalCopyBoundary = finalCopyBoundary;
+            _commitFactory = commitFactory ?? (target => OwnedDownloadCommit.Create(target));
         }
 
         public async Task<BulkObjectOperationPlan> PlanAsync(
@@ -74,7 +101,7 @@ namespace CloudflareR2Uploader.Services
                         cancellationToken.ThrowIfCancellationRequested();
                         entry.SelectedPrefix = prefix;
                         entry.RelativePath = BuildFolderRelativePath(prefix, entry.Key, folderRoot);
-                        if (!unique.ContainsKey(entry.Key)) unique.Add(entry.Key, entry);
+                        unique.TryAdd(entry.Key, entry);
                     }
                     continuation = page.NextContinuationToken;
                     Report(progress, "Scanning folders", null, unique.Count, 0, 0, 0);
@@ -118,13 +145,46 @@ namespace CloudflareR2Uploader.Services
             IProgress<BulkOperationProgress> progress,
             CancellationToken cancellationToken)
         {
-            if (plan == null) throw new ArgumentNullException("plan");
+            ArgumentNullException.ThrowIfNull(plan);
             foreach (string directory in plan.EmptyDirectoryPaths) Directory.CreateDirectory(PathUtility.ToExtendedLengthPath(directory));
             BulkObjectOperationResult result = new BulkObjectOperationResult { DestinationDirectory = plan.DestinationDirectory };
+            BulkDownloadPathAllocator paths = new BulkDownloadPathAllocator(
+                plan.Objects.Select(entry => entry.IsFolderMarker ? null : entry.LocalPath),
+                value => File.Exists(PathUtility.ToExtendedLengthPath(value)));
             object gate = new object();
             int next = 0;
             BulkConflictBehavior sticky = conflictBehavior;
             bool hasSticky = conflictBehavior != BulkConflictBehavior.Ask;
+
+            BulkConflictBehavior CurrentBehavior()
+            {
+                lock (gate) return hasSticky ? sticky : BulkConflictBehavior.Ask;
+            }
+
+            async Task<BulkConflictBehavior> ResolveAskAsync(string target, BulkConflictBehavior behavior)
+            {
+                if (behavior != BulkConflictBehavior.Ask) return behavior;
+                lock (gate)
+                {
+                    if (hasSticky) return sticky;
+                }
+                if (conflictPrompt == null) return BulkConflictBehavior.Skip;
+
+                BulkConflictDecision decision = await conflictPrompt(target).ConfigureAwait(false);
+                BulkConflictBehavior resolved = decision == null || decision.Behavior == BulkConflictBehavior.Ask
+                    ? BulkConflictBehavior.Skip
+                    : decision.Behavior;
+                if (decision != null && decision.ApplyToRemaining)
+                {
+                    lock (gate)
+                    {
+                        sticky = resolved;
+                        hasSticky = true;
+                    }
+                }
+                return resolved;
+            }
+
             List<Task> workers = new List<Task>();
             for (int worker = 0; worker < Math.Min(DefaultDownloadConcurrency, Math.Max(1, plan.Objects.Count)); worker++)
             {
@@ -133,58 +193,186 @@ namespace CloudflareR2Uploader.Services
                     while (true)
                     {
                         BulkObjectEntry entry;
+                        int entryOwner;
                         lock (gate)
                         {
                             if (next >= plan.Objects.Count) return;
-                            entry = plan.Objects[next++];
+                            entryOwner = next++;
+                            entry = plan.Objects[entryOwner];
                         }
                         cancellationToken.ThrowIfCancellationRequested();
-                        string target = entry.LocalPath;
+                        string originalTarget = entry.LocalPath;
                         if (entry.IsFolderMarker)
                         {
-                            Directory.CreateDirectory(PathUtility.ToExtendedLengthPath(target));
+                            Directory.CreateDirectory(PathUtility.ToExtendedLengthPath(originalTarget));
                             lock (gate) { result.Completed++; result.Succeeded++; }
                             Report(progress, "Creating folders", entry.Key, result.Completed, plan.Objects.Count, result.TransferredBytes, plan.TotalBytes);
                             continue;
                         }
-                        BulkConflictBehavior behavior = hasSticky ? sticky : BulkConflictBehavior.Ask;
-                        if (File.Exists(PathUtility.ToExtendedLengthPath(target)))
+
+                        string target = originalTarget;
+                        string partial = null;
+                        bool skipped = false;
+                        bool renamed = false;
+                        try
                         {
-                            if (behavior == BulkConflictBehavior.Ask && conflictPrompt != null)
+                            bool ownsOriginal = paths.TryClaimOriginal(entryOwner, originalTarget);
+                            bool finalExists = File.Exists(PathUtility.ToExtendedLengthPath(originalTarget));
+                            bool partialExists = File.Exists(PathUtility.ToExtendedLengthPath(originalTarget + ".r2partial"));
+                            BulkConflictBehavior behavior = CurrentBehavior();
+                            bool allowOverwrite = false;
+
+                            if (!ownsOriginal || finalExists || partialExists)
                             {
-                                BulkConflictDecision decision = await conflictPrompt(target).ConfigureAwait(false);
-                                behavior = decision == null ? BulkConflictBehavior.Skip : decision.Behavior;
-                                if (decision != null && decision.ApplyToRemaining) { lock (gate) { sticky = behavior; hasSticky = true; } }
+                                behavior = await ResolveAskAsync(originalTarget, behavior).ConfigureAwait(false);
+                                if (behavior == BulkConflictBehavior.Skip)
+                                {
+                                    skipped = true;
+                                }
+                                else if (behavior == BulkConflictBehavior.RenameAutomatically)
+                                {
+                                    target = paths.AllocateRename(entryOwner, originalTarget);
+                                    renamed = true;
+                                }
+                                else if (behavior == BulkConflictBehavior.Overwrite)
+                                {
+                                    if (!ownsOriginal || partialExists)
+                                        throw new IOException("The local download path is owned or claimed by another download and cannot be overwritten safely.");
+                                    allowOverwrite = finalExists;
+                                }
                             }
-                            if (behavior == BulkConflictBehavior.Skip) { lock (gate) { result.Skipped++; result.Completed++; } continue; }
-                            if (behavior == BulkConflictBehavior.RenameAutomatically)
+
+                            Directory.CreateDirectory(PathUtility.ToExtendedLengthPath(Path.GetDirectoryName(target)));
+                            int collisionRetries = 0;
+                            FileStream stream = null;
+                            while (!skipped && stream == null)
                             {
-                                target = BulkConflictNameUtility.FindAvailable(target, value => File.Exists(PathUtility.ToExtendedLengthPath(value)));
+                                partial = target + ".r2partial";
+                                try
+                                {
+                                    stream = OwnedDownloadStream.Create(partial);
+                                }
+                                catch (IOException ex) when (File.Exists(PathUtility.ToExtendedLengthPath(partial)))
+                                {
+                                    if (++collisionRetries > MaxLocalCollisionRetries)
+                                        throw new IOException("No collision-free partial download path was found.", ex);
+
+                                    bool wasAsk = behavior == BulkConflictBehavior.Ask;
+                                    behavior = await ResolveAskAsync(target, behavior).ConfigureAwait(false);
+                                    if (behavior == BulkConflictBehavior.Skip)
+                                    {
+                                        skipped = true;
+                                    }
+                                    else if (behavior == BulkConflictBehavior.RenameAutomatically)
+                                    {
+                                        target = paths.AllocateRename(entryOwner, originalTarget);
+                                        renamed = true;
+                                        allowOverwrite = false;
+                                    }
+                                    else
+                                    {
+                                        string message = wasAsk
+                                            ? "The partial download path already exists and cannot be overwritten safely."
+                                            : "An unexpected partial download path appeared and was not overwritten.";
+                                        throw new IOException(message, ex);
+                                    }
+                                }
+                            }
+
+                            if (!skipped)
+                            {
+                                long? length;
+                                using (stream)
+                                {
+                                    length = await _source.DownloadAsync(settings, credentials, entry.Key, stream, cancellationToken).ConfigureAwait(false);
+                                    await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                                    if (length.HasValue && stream.Length != length.Value) throw new IOException("The downloaded byte count did not match Content-Length.");
+
+                                    IDownloadCommit commit = _commitFactory(target);
+                                    try
+                                    {
+                                        using (commit)
+                                        {
+                                            stream.Position = 0;
+                                            await stream.CopyToAsync(commit.Stream, 81920, cancellationToken).ConfigureAwait(false);
+                                            if (_finalCopyBoundary != null)
+                                                await _finalCopyBoundary(DownloadCommitStage.Copied, cancellationToken).ConfigureAwait(false);
+                                            await commit.Stream.FlushAsync(cancellationToken).ConfigureAwait(false);
+                                            if (_finalCopyBoundary != null)
+                                                await _finalCopyBoundary(DownloadCommitStage.AsyncFlushed, cancellationToken).ConfigureAwait(false);
+                                            if (commit.Stream.Length != stream.Length)
+                                                throw new IOException("The local download commit did not match the claimed download length.");
+                                            if (_finalCopyBoundary != null)
+                                                await _finalCopyBoundary(DownloadCommitStage.LengthValidated, cancellationToken).ConfigureAwait(false);
+                                            if (entry.LastModifiedUtc.HasValue)
+                                                File.SetLastWriteTimeUtc(commit.Stream.SafeFileHandle, entry.LastModifiedUtc.Value);
+                                            if (_finalCopyBoundary != null)
+                                                await _finalCopyBoundary(DownloadCommitStage.TimestampApplied, cancellationToken).ConfigureAwait(false);
+                                            cancellationToken.ThrowIfCancellationRequested();
+                                            commit.Stream.Flush(true);
+                                            cancellationToken.ThrowIfCancellationRequested();
+                                            if (_finalCopyBoundary != null)
+                                                await _finalCopyBoundary(DownloadCommitStage.DurablyFlushed, cancellationToken).ConfigureAwait(false);
+
+                                            while (!skipped)
+                                            {
+                                                if (commit.TryPublish(target, allowOverwrite)) break;
+                                                if (++collisionRetries > MaxLocalCollisionRetries)
+                                                    throw new IOException("No collision-free final download path was found.");
+                                                if (allowOverwrite)
+                                                    throw new IOException("The existing local file could not be replaced atomically.");
+
+                                                bool wasAsk = behavior == BulkConflictBehavior.Ask;
+                                                behavior = await ResolveAskAsync(target, behavior).ConfigureAwait(false);
+                                                if (behavior == BulkConflictBehavior.Skip)
+                                                {
+                                                    skipped = true;
+                                                }
+                                                else if (behavior == BulkConflictBehavior.RenameAutomatically)
+                                                {
+                                                    target = paths.AllocateRename(entryOwner, originalTarget);
+                                                    renamed = true;
+                                                }
+                                                else if (behavior == BulkConflictBehavior.Overwrite && wasAsk)
+                                                {
+                                                    allowOverwrite = true;
+                                                }
+                                                else
+                                                {
+                                                    throw new IOException("An unexpected local file appeared and was not overwritten.");
+                                                }
+                                            }
+                                        }
+                                    }
+                                    finally
+                                    {
+                                        if (commit.CleanupFailure != null && _log != null)
+                                            _log.Error(
+                                                "Bulk.DownloadCleanup",
+                                                "An owned local download commit could not be reclaimed.",
+                                                commit.CleanupFailure);
+                                    }
+                                }
+                            }
+
+                            if (renamed)
+                            {
                                 lock (gate) result.Renamed++;
                                 if (_log != null) _log.Info("Bulk.DownloadConflict", "Renamed a conflicting local download path to '" + LoggingService.Sanitize(Path.GetFileName(target)) + "'.");
                             }
-                        }
 
-                        string partial = target + ".r2partial";
-                        try
-                        {
-                            Directory.CreateDirectory(PathUtility.ToExtendedLengthPath(Path.GetDirectoryName(target)));
-                            long? length;
-                            using (FileStream stream = new FileStream(PathUtility.ToExtendedLengthPath(partial), FileMode.Create, FileAccess.Write, FileShare.None, 81920, true))
+                            if (skipped)
                             {
-                                length = await _source.DownloadAsync(settings, credentials, entry.Key, stream, cancellationToken).ConfigureAwait(false);
-                                await stream.FlushAsync(cancellationToken).ConfigureAwait(false);
-                                if (length.HasValue && stream.Length != length.Value) throw new IOException("The downloaded byte count did not match Content-Length.");
+                                lock (gate) { result.Skipped++; result.Completed++; }
                             }
-                            if (File.Exists(PathUtility.ToExtendedLengthPath(target))) File.Delete(PathUtility.ToExtendedLengthPath(target));
-                            File.Move(PathUtility.ToExtendedLengthPath(partial), PathUtility.ToExtendedLengthPath(target));
-                            if (entry.LastModifiedUtc.HasValue) File.SetLastWriteTimeUtc(PathUtility.ToExtendedLengthPath(target), entry.LastModifiedUtc.Value);
-                            lock (gate) { result.Completed++; result.Succeeded++; result.TransferredBytes += entry.Size; }
+                            else
+                            {
+                                lock (gate) { result.Completed++; result.Succeeded++; result.TransferredBytes += entry.Size; }
+                            }
                         }
-                        catch (OperationCanceledException) { TryDelete(partial); throw; }
+                        catch (OperationCanceledException) { throw; }
                         catch (Exception ex)
                         {
-                            TryDelete(partial);
                             lock (gate) { result.Failures.Add(new BulkObjectFailure { Key = entry.Key, Message = LoggingService.Sanitize(ex.Message) }); result.Completed++; }
                         }
                         Report(progress, "Downloading", entry.Key, result.Completed, plan.Objects.Count, result.TransferredBytes, plan.TotalBytes);
@@ -228,8 +416,6 @@ namespace CloudflareR2Uploader.Services
         {
             if (progress != null) progress.Report(new BulkOperationProgress { State = state, CurrentObject = current, CompletedObjects = completed, TotalObjects = total, TransferredBytes = bytes, TotalBytes = totalBytes });
         }
-        private static void TryDelete(string path) { try { if (File.Exists(PathUtility.ToExtendedLengthPath(path))) File.Delete(PathUtility.ToExtendedLengthPath(path)); } catch (IOException) { } catch (UnauthorizedAccessException) { } }
-
         private sealed class AwsBulkObjectSource : IR2BulkObjectSource
         {
             public async Task<BulkListingPage> ListAsync(AppSettings settings, R2Credentials credentials, string prefix, string continuationToken, CancellationToken cancellationToken)
@@ -239,7 +425,7 @@ namespace CloudflareR2Uploader.Services
                     ListObjectsV2Response response = await client.ListObjectsV2Async(new ListObjectsV2Request { BucketName = settings.BucketName, Prefix = prefix, ContinuationToken = continuationToken, MaxKeys = 1000 }, cancellationToken).ConfigureAwait(false);
                     BulkListingPage page = new BulkListingPage { NextContinuationToken = response.IsTruncated ? response.NextContinuationToken : null };
                     foreach (S3Object item in response.S3Objects)
-                        page.Objects.Add(new BulkObjectEntry { Key = item.Key, Size = item.Size, LastModifiedUtc = item.LastModified.ToUniversalTime(), ETag = item.ETag, IsFolderMarker = item.Key.EndsWith("/", StringComparison.Ordinal) && item.Size == 0 });
+                        page.Objects.Add(new BulkObjectEntry { Key = item.Key, Size = item.Size, LastModifiedUtc = item.LastModified.ToUniversalTime(), ETag = item.ETag, IsFolderMarker = item.Key.EndsWith('/') && item.Size == 0 });
                     return page;
                 }
             }

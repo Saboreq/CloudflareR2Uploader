@@ -41,7 +41,9 @@ namespace CloudflareR2Uploader.Models
         public string ToLogSafeString()
         {
             string id = AccessKeyId ?? string.Empty;
-            string masked = id.Length <= 4 ? new string('*', id.Length) : id.Substring(0, 4) + new string('*', id.Length - 4);
+            string masked = id.Length <= 4
+                ? new string('*', id.Length)
+                : string.Concat(id.AsSpan(0, 4), new string('*', id.Length - 4));
             return "accessKeyId=" + masked + ", secretAccessKey=<redacted>";
         }
 

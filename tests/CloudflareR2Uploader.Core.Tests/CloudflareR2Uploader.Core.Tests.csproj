@@ -1,11 +1,6 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-  <PropertyGroup>
-    <!-- Links test files the legacy WinForms suite also compiles; see build/Modern.props. -->
-    <SharedSourceWithLegacy>true</SharedSourceWithLegacy>
-  </PropertyGroup>
-
-  <Import Project="..\..\build\ModernTests.props" />
+  <Import Project="..\..\build\Tests.props" />
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -16,27 +11,8 @@
     <ProjectReference Include="..\..\src\CloudflareR2Uploader.Core\CloudflareR2Uploader.Core.csproj" />
   </ItemGroup>
 
-  <!--
-    Tests migrated from the WinForms suite. They are linked rather than copied so the
-    assertions cannot drift between the two front ends while both exist. Assertions are
-    unchanged; only the project they run in changed.
-  -->
   <ItemGroup>
-    <Compile Include="..\CloudflareR2Uploader.Tests\TestSupport.cs" Link="Migrated\TestSupport.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\BrowserViewServiceTests.cs" Link="Migrated\BrowserViewServiceTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\BulkLocalPathMapperTests.cs" Link="Migrated\BulkLocalPathMapperTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\FileSizeFormatterTests.cs" Link="Migrated\FileSizeFormatterTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\MimeTypeServiceTests.cs" Link="Migrated\MimeTypeServiceTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\MultipartCalculatorTests.cs" Link="Migrated\MultipartCalculatorTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\ObjectKeyUtilityTests.cs" Link="Migrated\ObjectKeyUtilityTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\PathUtilityTests.cs" Link="Migrated\PathUtilityTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\PreviewCacheServiceTests.cs" Link="Migrated\PreviewCacheServiceTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\ProgressAggregationTests.cs" Link="Migrated\ProgressAggregationTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\R2BrowserPaginationStateTests.cs" Link="Migrated\R2BrowserPaginationStateTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\R2BrowserPathUtilityTests.cs" Link="Migrated\R2BrowserPathUtilityTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\R2ObjectOperationPathUtilityTests.cs" Link="Migrated\R2ObjectOperationPathUtilityTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\SettingsServiceTests.cs" Link="Migrated\SettingsServiceTests.cs" />
-    <Compile Include="..\CloudflareR2Uploader.Tests\UploadStateStoreTests.cs" Link="Migrated\UploadStateStoreTests.cs" />
+    <Compile Include="..\Shared\TestSupport.cs" Link="Shared\TestSupport.cs" />
   </ItemGroup>
 
 </Project>

@@ -36,7 +36,7 @@ namespace CloudflareR2Uploader.Utilities
         /// </summary>
         public static long CalculatePartSize(long fileSize, long configuredPartSize)
         {
-            if (fileSize < 0) throw new ArgumentOutOfRangeException("fileSize");
+            ArgumentOutOfRangeException.ThrowIfNegative(fileSize);
 
             long partSize = configuredPartSize < MinPartSize ? MinPartSize : configuredPartSize;
             if (partSize > MaxPartSize) partSize = MaxPartSize;
@@ -64,7 +64,7 @@ namespace CloudflareR2Uploader.Utilities
         /// <summary>Number of parts a file of the given size needs. A zero-byte file has one part.</summary>
         public static int CalculatePartCount(long fileSize, long partSize)
         {
-            if (partSize <= 0) throw new ArgumentOutOfRangeException("partSize");
+            ArgumentOutOfRangeException.ThrowIfNegativeOrZero(partSize);
             if (fileSize <= 0) return 1;
 
             long count = CeilingDivide(fileSize, partSize);
@@ -74,7 +74,7 @@ namespace CloudflareR2Uploader.Utilities
         /// <summary>Byte offset at which a 1-based part number begins.</summary>
         public static long GetPartOffset(int partNumber, long partSize)
         {
-            if (partNumber < 1) throw new ArgumentOutOfRangeException("partNumber");
+            ArgumentOutOfRangeException.ThrowIfLessThan(partNumber, 1);
             return (partNumber - 1) * partSize;
         }
 

@@ -314,9 +314,19 @@ namespace CloudflareR2Uploader.Wpf.ViewModels.Activity
 
             if (!confirmed) return;
 
-            await _history.ClearAsync().ConfigureAwait(true);
+            bool cleared = await _history.ClearAsync().ConfigureAwait(true);
             await ReloadAsync().ConfigureAwait(true);
-            _toasts.ShowSuccess("Activity history cleared");
+            if (cleared)
+            {
+                _toasts.ShowSuccess("Activity history cleared");
+            }
+            else
+            {
+                await _dialogs.ShowErrorAsync(
+                    "Activity history could not be cleared",
+                    "The history file is still present. Close programs using it and try again.")
+                    .ConfigureAwait(true);
+            }
         }
 
         // ----------------------------------------------------------------------- loading

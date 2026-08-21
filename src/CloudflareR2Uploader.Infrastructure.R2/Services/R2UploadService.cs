@@ -1,5 +1,4 @@
 using System;
-using System.Globalization;
 using System.Threading;
 using System.Threading.Tasks;
 using Amazon.S3;
@@ -42,6 +41,7 @@ namespace CloudflareR2Uploader.Services
         private readonly UploadStateStore _stateStore;
         private readonly R2SinglePartUploader _singlePartUploader;
         private readonly R2MultipartUploader _multipartUploader;
+        private readonly UploadObjectVerifier _verifier;
 
         public R2UploadService(ILoggingService log, UploadStateStore stateStore)
         {
@@ -49,6 +49,7 @@ namespace CloudflareR2Uploader.Services
             _stateStore = stateStore;
             _singlePartUploader = new R2SinglePartUploader(log);
             _multipartUploader = new R2MultipartUploader(log, stateStore);
+            _verifier = new UploadObjectVerifier(log);
         }
 
         public R2MultipartUploader MultipartUploader { get { return _multipartUploader; } }
@@ -63,9 +64,9 @@ namespace CloudflareR2Uploader.Services
             IProgress<UploadProgressInfo> progress,
             CancellationToken cancellationToken)
         {
-            if (client == null) throw new ArgumentNullException("client");
-            if (item == null) throw new ArgumentNullException("item");
-            if (settings == null) throw new ArgumentNullException("settings");
+            ArgumentNullException.ThrowIfNull(client);
+            ArgumentNullException.ThrowIfNull(item);
+            ArgumentNullException.ThrowIfNull(settings);
 
             string objectKey = item.ObjectKey;
             SpeedEstimator speedEstimator = new SpeedEstimator();
@@ -214,39 +215,9 @@ namespace CloudflareR2Uploader.Services
                     new GetObjectMetadataRequest { BucketName = settings.BucketName, Key = objectKey },
                     cancellationToken).ConfigureAwait(false);
 
-                long remoteLength = head.ContentLength;
-
-                if (remoteLength != item.FileSize)
-                {
-                    string detail = string.Format(
-                        CultureInfo.CurrentCulture,
-                        "R2 stored {0} but the local file is {1}. The object was not the expected size, so it should not be treated as a good copy.",
-                        FileSizeFormatter.Format(remoteLength),
-                        FileSizeFormatter.Format(item.FileSize));
-
-                    if (_log != null)
-                    {
-                        _log.Error("Upload.Verify",
-                            "Size mismatch for key=" + objectKey + ": remote=" + remoteLength + " local=" + item.FileSize, null);
-                    }
-
-                    return Fail(item, "The uploaded object does not match the local file", detail, settings, objectKey, true);
-                }
-
-                string eTag = !string.IsNullOrEmpty(head.ETag) ? head.ETag : uploadETag;
-                string publicUrl = ObjectKeyUtility.BuildPublicUrl(settings.PublicBaseUrl, objectKey);
-
-                item.SetVerified(eTag, remoteLength, publicUrl);
-                item.SetStatus(UploadItemStatus.Completed);
-
-                if (_log != null)
-                {
-                    _log.Info("Upload.Verify",
-                        "Verified key=" + objectKey + " size=" + remoteLength +
-                        " multipart=" + wasMultipart + " etag=" + eTag);
-                }
-
-                return UploadResult.Success(objectKey, eTag, remoteLength, wasMultipart);
+                return _verifier.Verify(
+                    item, settings, objectKey, head.ContentLength,
+                    uploadETag, head.ETag, wasMultipart);
             }
             catch (OperationCanceledException)
             {
@@ -277,7 +248,7 @@ namespace CloudflareR2Uploader.Services
             public string ObjectKey { get; private set; }
         }
 
-        private async Task<OverwriteResolution> ResolveOverwriteAsync(
+        private static async Task<OverwriteResolution> ResolveOverwriteAsync(
             IAmazonS3 client,
             UploadQueueItem item,
             AppSettings settings,
@@ -324,7 +295,7 @@ namespace CloudflareR2Uploader.Services
         }
 
         /// <summary>Finds the first "name (n).ext" variant that does not exist yet.</summary>
-        private async Task<string> FindFreeKeyAsync(
+        private static async Task<string> FindFreeKeyAsync(
             IAmazonS3 client, string bucketName, string objectKey, CancellationToken cancellationToken)
         {
             for (int index = 1; index <= MaxRenameAttempts; index++)
