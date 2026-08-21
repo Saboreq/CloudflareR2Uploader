@@ -103,6 +103,27 @@ namespace CloudflareR2Uploader.Services
             throw new ArgumentException("A Windows publication target must be an absolute DOS or UNC path.", nameof(target));
         }
 
+        internal static byte[] CreateWindowsRenameInformationBuffer(
+            string nativeTarget,
+            bool overwrite)
+        {
+            byte[] targetBytes = Encoding.Unicode.GetBytes(nativeTarget);
+            int fileNameOffset = Marshal.OffsetOf<FileRenameInformation>(
+                nameof(FileRenameInformation.FileName)).ToInt32();
+            int bufferSize = checked(
+                Marshal.SizeOf<FileRenameInformation>() + targetBytes.Length);
+            byte[] buffer = new byte[bufferSize];
+            buffer[Marshal.OffsetOf<FileRenameInformation>(
+                nameof(FileRenameInformation.ReplaceIfExists)).ToInt32()] =
+                overwrite ? (byte)1 : (byte)0;
+            BitConverter.GetBytes(targetBytes.Length).CopyTo(
+                buffer,
+                Marshal.OffsetOf<FileRenameInformation>(
+                    nameof(FileRenameInformation.FileNameLength)).ToInt32());
+            targetBytes.CopyTo(buffer, fileNameOffset);
+            return buffer;
+        }
+
         public static OwnedDownloadCommit Create(string target)
         {
             return Create(target, null);
@@ -270,32 +291,17 @@ namespace CloudflareR2Uploader.Services
                 out int nativeError)
             {
                 string nativeTarget = ToWindowsNativePublishPath(target);
-                byte[] targetBytes = Encoding.Unicode.GetBytes(nativeTarget);
-                int fileNameOffset = Marshal.OffsetOf<FileRenameInformation>(nameof(FileRenameInformation.FileName)).ToInt32();
-                IntPtr buffer = Marshal.AllocHGlobal(fileNameOffset + targetBytes.Length);
+                byte[] information = CreateWindowsRenameInformationBuffer(nativeTarget, overwrite);
+                IntPtr buffer = Marshal.AllocHGlobal(information.Length);
                 try
                 {
-                    for (int index = 0; index < fileNameOffset + targetBytes.Length; index++)
-                        Marshal.WriteByte(buffer, index, 0);
-                    Marshal.WriteByte(
-                        buffer,
-                        Marshal.OffsetOf<FileRenameInformation>(nameof(FileRenameInformation.ReplaceIfExists)).ToInt32(),
-                        overwrite ? (byte)1 : (byte)0);
-                    Marshal.WriteIntPtr(
-                        buffer,
-                        Marshal.OffsetOf<FileRenameInformation>(nameof(FileRenameInformation.RootDirectory)).ToInt32(),
-                        IntPtr.Zero);
-                    Marshal.WriteInt32(
-                        buffer,
-                        Marshal.OffsetOf<FileRenameInformation>(nameof(FileRenameInformation.FileNameLength)).ToInt32(),
-                        targetBytes.Length);
-                    Marshal.Copy(targetBytes, 0, IntPtr.Add(buffer, fileNameOffset), targetBytes.Length);
+                    Marshal.Copy(information, 0, buffer, information.Length);
 
                     if (SetFileInformationByHandle(
                         handle,
                         WindowsFileRenameInfo,
                         buffer,
-                        (uint)(fileNameOffset + targetBytes.Length)))
+                        (uint)information.Length))
                     {
                         nativeError = 0;
                         return true;

@@ -1,5 +1,6 @@
 using System;
 using System.IO;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Win32.SafeHandles;
@@ -270,6 +271,28 @@ namespace CloudflareR2Uploader.Tests
                     () => OwnedDownloadCommit.ToWindowsNativePublishPath(target),
                     "Target was accepted: " + (target ?? "<null>"));
             }
+        }
+
+        [TestMethod]
+        public void WindowsRenameBuffer_ReservesTerminatedVariableFileName()
+        {
+            const string nativeTarget = @"\\?\C:\downloads\report.txt";
+            int fileNameOffset = IntPtr.Size == 8 ? 20 : 12;
+            int structureSize = IntPtr.Size == 8 ? 24 : 16;
+            int encodedLength = nativeTarget.Length * sizeof(char);
+
+            byte[] buffer = OwnedDownloadCommit.CreateWindowsRenameInformationBuffer(
+                nativeTarget,
+                overwrite: true);
+
+            Assert.AreEqual(structureSize + encodedLength, buffer.Length);
+            Assert.AreEqual(1, buffer[0]);
+            Assert.AreEqual(encodedLength, BitConverter.ToInt32(buffer, fileNameOffset - sizeof(int)));
+            Assert.AreEqual(
+                nativeTarget,
+                Encoding.Unicode.GetString(buffer, fileNameOffset, encodedLength));
+            Assert.AreEqual(0, buffer[fileNameOffset + encodedLength]);
+            Assert.AreEqual(0, buffer[fileNameOffset + encodedLength + 1]);
         }
 
         [TestMethod]
