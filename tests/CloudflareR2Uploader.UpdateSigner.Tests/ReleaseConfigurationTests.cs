@@ -259,6 +259,19 @@ namespace CloudflareR2Uploader.Tests
         }
 
         [TestMethod]
+        public void PowerShellBehavioralHarness_UsesNestedTypeSyntaxForNamedCurves()
+        {
+            string harness = ReadRepositoryFile("tests", "PowerShell", "Test-UpdateReleaseScripts.ps1");
+
+            StringAssert.Contains(
+                harness,
+                "[System.Security.Cryptography.ECCurve+NamedCurves]::nistP256");
+            Assert.IsFalse(
+                harness.Contains("[System.Security.Cryptography.ECCurve]::NamedCurves", StringComparison.Ordinal),
+                "PowerShell resolves nested CLR types with '+', not a static-property member chain.");
+        }
+
+        [TestMethod]
         public void ReleaseVersionPatterns_AgreeOnTheStrictPublishableSemVerGrammar()
         {
             string buildPattern = ExtractPublishableSemanticVersionPattern(

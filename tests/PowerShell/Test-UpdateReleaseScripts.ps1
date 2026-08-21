@@ -190,7 +190,7 @@ function Test-BuildReleaseValidation {
         $validRsa = [System.Security.Cryptography.RSA]::Create(2048)
         $weakRsa = [System.Security.Cryptography.RSA]::Create(1024)
         $ecdsa = [System.Security.Cryptography.ECDsa]::Create(
-            [System.Security.Cryptography.ECCurve]::NamedCurves.nistP256)
+            [System.Security.Cryptography.ECCurve+NamedCurves]::nistP256)
         try {
             $validBytes = $validRsa.ExportSubjectPublicKeyInfo()
             $keys = @(
